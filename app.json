@@ -46,13 +46,5 @@
             "plan": "heroku-postgresql:hobby-dev",
             "as": "DATABASE"
         }
-    ],
-    "buildpacks": [
-        {
-            "url": "https://github.com/heroku/heroku-buildpack-python"
-        },
-        {
-            "url": "https://github.com/yunojuno/python-poetry-buildpack.git"
-        }
     ]
 }
