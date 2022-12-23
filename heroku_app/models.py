@@ -13,70 +13,47 @@ from . import github
 logger = logging.getLogger(__name__)
 
 
-def parse_description(description: str) -> str:
+def parse_description(description: str) -> tuple[str, str]:
     """Extract deployed commit from description."""
-    regex = r"Deploy (?P<commit>\w*)"
-    if match := re.match(regex, description, re.RegexFlag.IGNORECASE):
-        return match["commit"]
-    return ""
+    action, message = description.split(" ", maxsplit=1)
+    if action.lower() == "deploy":
+        return str(HerokuRelease.ReleaseType.DEPLOYMENT), message
+    if action.lower() == "set":
+        return str(HerokuRelease.ReleaseType.ENV_VARS), ""
+    if action.lower() in ("add", "remove"):
+        return str(HerokuRelease.ReleaseType.ADD_ON), ""
+    return str(HerokuRelease.ReleaseType.UNKNOWN), ""
 
 
 class HerokuReleaseQuerySet(models.QuerySet):
     def deployments(self) -> HerokuReleaseQuerySet:
         return self.exclude(commit_hash="")
 
-    def has_parent(self) -> HerokuReleaseQuerySet:
-        return self.exclude(parent__isnull=True)
-
-    def has_no_parent(self) -> HerokuReleaseQuerySet:
-        return self.filter(parent__isnull=True)
-
 
 class HerokuReleaseManager(models.Manager):
     def create(self, **release_kwargs: Any) -> HerokuRelease:
         description = release_kwargs["description"]
+        release_type, commit = parse_description(description)
         slug = release_kwargs["slug"]
         return super().create(
             created_at=dateparser.parse(release_kwargs["created_at"]),
             version=release_kwargs["version"],
             description=description,
-            commit_hash=parse_description(description),
+            release_type=release_type,
+            commit_hash=commit,
             status=release_kwargs["status"],
             slug_id=slug["id"] if slug else None,
             raw=release_kwargs,
         )
 
-    def get_parent(self, release: HerokuRelease) -> HerokuRelease | None:
-        return (
-            self.get_queryset()
-            .deployments()
-            .filter(version__lt=release.version)
-            .order_by("version")
-            .last()
-        )
-
-    def backfill_missing_parents(self) -> None:
-        deployment = (
-            self.get_queryset()
-            .deployments()
-            .has_not_parent()
-            .order_by("version")
-            .last()
-        )
-        while deployment:
-            if parent := self.get_parent(deployment):
-                deployment.parent = parent
-                deployment.save(update_fields=["parent"])
-            deployment = parent
-
-    def backfill_missing_release_notes(self) -> None:
-        for release in (
-            self.get_queryset().deployments().has_parent().filter(release_note="")
-        ):
-            release.set_release_note()
-
 
 class HerokuRelease(models.Model):
+    class ReleaseType(models.TextChoices):
+
+        DEPLOYMENT = ("DEPLOYMENT", "Deployment")
+        ADD_ON = ("ADD_ON", "Adjust addons")
+        ENV_VARS = ("ENV_VARS", "Adjust env vars")
+        UNKNOWN = ("UNKNOWN", "Unknown")
 
     version = models.PositiveIntegerField(unique=True)
 
@@ -96,6 +73,13 @@ class HerokuRelease(models.Model):
 
     release_note = models.TextField(blank=True, default="")
 
+    release_type = models.CharField(
+        max_length=10,
+        choices=ReleaseType.choices,
+        blank=True,
+        default=ReleaseType.UNKNOWN,
+    )
+
     objects = HerokuReleaseManager.from_queryset(HerokuReleaseQuerySet)()
 
     def __repr__(self) -> str:
@@ -106,6 +90,7 @@ class HerokuRelease(models.Model):
 
     @property
     def base_head(self) -> str:
+        """Form the base...head reference used to fetch diff from Github."""
         if not self.commit_hash:
             return ""
         if not self.parent:
@@ -115,12 +100,28 @@ class HerokuRelease(models.Model):
         return f"{self.parent.commit_hash}...{self.commit_hash}"
 
     def get_release_note(self) -> str:
+        """Fetch release note from Github."""
+        if not self.base_head:
+            return ""
         try:
             return github.get_release_note(self.base_head)
         except HTTPError:
             logger.exception("Error retrieving release note")
-            return ""
+        return ""
 
-    def set_release_note(self) -> None:
+    def update_release_note(self) -> None:
         self.release_note = self.get_release_note()
         self.save(update_fields=["release_note"])
+
+    def get_parent(self) -> HerokuRelease | None:
+        """Return first deployment before this one."""
+        return (
+            HerokuRelease.objects.filter(version__lt=self.version)
+            .deployments()
+            .order_by("version")
+            .last()
+        )
+
+    def update_parent(self) -> None:
+        self.parent = self.get_parent()
+        self.save(update_fields=["parent"])

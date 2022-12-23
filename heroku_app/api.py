@@ -45,7 +45,7 @@ class HerokReleaseCrawler:
         self.page_size: int = 1000
 
 
-def crawl(max_count: int, range_start: str = "id ..", page_size: int = 10) -> list:
+def crawl(max_count: int, range_start: str = "id ..", page_size: int = 1000) -> list:
     range = f"{range_start};max={page_size}"
     releases = []
     while range and len(releases) < max_count:
