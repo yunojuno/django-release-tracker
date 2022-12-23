@@ -26,7 +26,7 @@ packages = [{ include = "release_notes" }]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-django = "^3.2 | ^ 4.0"
+django = "^3.2 || ^ 4.0"
 dateparser = "*"
 requests = "*"
 
