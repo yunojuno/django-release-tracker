@@ -93,3 +93,8 @@ ______________________ summary __________________________
 
 There is a `.github/workflows/tox.yml` file that can be used as a
 baseline to run all of the tests on Github.
+
+
+### Heroku
+
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)

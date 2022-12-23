@@ -1,11 +1,14 @@
-from os import path
+from os import getenv, path
+
+import dj_database_url
 
 DEBUG = True
 TEMPLATE_DEBUG = True
 USE_TZ = True
 USE_L10N = True
 
-DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": "demo.db"}}
+# DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": "demo.db"}}
+DATABASES = {"default": dj_database_url.config(conn_max_age=600, ssl_require=True)}
 
 INSTALLED_APPS = (
     "django.contrib.admin",
@@ -46,7 +49,7 @@ TEMPLATES = [
 
 STATIC_URL = "/static/"
 
-SECRET_KEY = "secret"  # noqa: S105
+SECRET_KEY = getenv("DJANGO_SECRET_KEY")
 
 LOGGING = {
     "version": 1,

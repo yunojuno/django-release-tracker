@@ -1,0 +1,58 @@
+{
+    "name": "Django Release Monitor",
+    "description": "Automagically monitor Heroku releases",
+    "scripts": {
+        "postdeploy": "python manage.py migrate"
+    },
+    "env": {
+        "DJANGO_SETTINGS_MODULE": {
+            "description": "Location of the settings (fixed)",
+            "value": "demo.settings",
+            "required": true
+        },
+        "DJANGO_SECRET_KEY": {
+            "description": "Used as the Django secret key.",
+            "generator": "secret"
+        },
+        "WEB_CONCURRENCY": {
+            "description": "The number of processes to run.",
+            "value": "1"
+        },
+        "GITHUB_API_TOKEN": {
+            "description": "Github token used to make API requests.",
+            "value": ""
+        },
+        "GITHUB_ORG_NAME": {
+            "description": "The Github organisation to whom the source repo belongs.",
+            "value": ""
+        },
+        "GITHUB_REPO_NAME": {
+            "description": "The name of the Github repo that is being deployed.",
+            "value": ""
+        },
+        "GITHUB_USER_NAME": {
+            "description": "The username of the owner of the GITHUB_API_TOKEN.",
+            "value": ""
+        }
+    },
+    "formation": {
+        "web": {
+            "quantity": 1,
+            "size": "standard-1x"
+        }
+    },
+    "addons": [
+        {
+            "plan": "heroku-postgresql:hobby-dev",
+            "as": "DATABASE"
+        }
+    ],
+    "buildpacks": [
+        {
+            "url": "https://github.com/heroku/heroku-buildpack-python"
+        },
+        {
+            "url": "https://github.com/yunojuno/python-poetry-buildpack.git"
+        }
+    ]
+}
