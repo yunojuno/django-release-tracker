@@ -48,6 +48,7 @@ TEMPLATES = [
 ]
 
 STATIC_URL = "/static/"
+STATIC_ROOT = path.join(PROJECT_DIR, "static")
 
 SECRET_KEY = getenv("DJANGO_SECRET_KEY")
 
