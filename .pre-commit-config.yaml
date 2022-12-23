@@ -33,7 +33,9 @@ repos:
     rev: v0.991
     hooks:
       - id: mypy
-        # additional_dependencies:
+        additional_dependencies:
+          - types-requests
+          - types-dateparser
         args:
           - --disallow-untyped-defs
           - --disallow-incomplete-defs
