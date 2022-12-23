@@ -15,6 +15,7 @@ INSTALLED_APPS = (
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "release_notes",
+    "heroku_app",
 )
 
 MIDDLEWARE = [
