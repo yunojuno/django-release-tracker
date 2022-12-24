@@ -26,12 +26,12 @@ packages = [{ include = "heroku_app" }]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+django = "^3.2 || ^4.0"
 dateparser = "*"
-dj-database-url = "*"
-django = "^3.2 || ^ 4.0"
 requests = "*"
 
 # optional - Heroku only
+dj-database-url = { version = "*", optional = true }
 psycopg2 = { version = "*", optional = true }
 gunicorn = { version = "*", optional = true }
 whitenoise = { version = "*", optional = true }
@@ -56,7 +56,7 @@ pytest-django = "*"
 tox = "*"
 
 [tool.poetry.extras]
-heroku = ["psycopg2", "gunicorn", "whitenoise"]
+heroku = ["psycopg2", "gunicorn", "whitenoise", "dj-database-url"]
 
 [build-system]
 requires = ["poetry>=0.12"]
