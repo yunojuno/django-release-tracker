@@ -12,36 +12,65 @@ from . import github
 logger = logging.getLogger(__name__)
 
 
-def parse_description(description: str) -> tuple[str, str]:
-    """Extract deployed commit from description."""
-    action, message = description.split(" ", maxsplit=1)
+def get_release_type(description: str) -> str:
+    """Extract release type from description."""
+    if description.lower().startswith("deploy"):
+        return str(HerokuRelease.ReleaseType.DEPLOYMENT)
+    if description.lower().endswith("config vars"):
+        return str(HerokuRelease.ReleaseType.ENV_VARS)
+    if description.lower().startswith("update"):
+        return str(HerokuRelease.ReleaseType.ENV_VARS)
+    if description.lower().startswith(("add", "attach", "detach")):
+        return str(HerokuRelease.ReleaseType.ADD_ON)
+    return str(HerokuRelease.ReleaseType.UNKNOWN)
+
+
+def get_commit_hash(description: str) -> str:
+    """Extract commit hash from release description."""
+    action, commit_hash = description.split(" ", maxsplit=1)
     if action.lower() == "deploy":
-        return str(HerokuRelease.ReleaseType.DEPLOYMENT), message
-    if action.lower() == "set":
-        return str(HerokuRelease.ReleaseType.ENV_VARS), ""
-    if action.lower() in ("add", "remove"):
-        return str(HerokuRelease.ReleaseType.ADD_ON), ""
-    return str(HerokuRelease.ReleaseType.UNKNOWN), ""
+        return commit_hash
+    return ""
+
+
+def get_release_parent(version: int) -> HerokuRelease | None:
+    """Fetch the most recent deployment."""
+    return (
+        HerokuRelease.objects.deployments()
+        .filter(version__lt=version)
+        .order_by("version")
+        .last()
+    )
 
 
 class HerokuReleaseQuerySet(models.QuerySet):
     def deployments(self) -> HerokuReleaseQuerySet:
-        return self.exclude(commit_hash="")
+        return self.filter(release_type=HerokuRelease.ReleaseType.DEPLOYMENT)
 
 
 class HerokuReleaseManager(models.Manager):
-    def create(self, **release_kwargs: Any) -> HerokuRelease:
-        description = release_kwargs["description"]
-        release_type, commit = parse_description(description)
-        # may not appear if we are creating from the env vars
-        slug = release_kwargs.get("slug", None)
+    def create(
+        self,
+        description: str,
+        version: int,
+        created_at: str,
+        status: str,
+        slug: dict | None = None,
+        **release_kwargs: Any,
+    ) -> HerokuRelease:
+        """Create a new release and set the parent property if a deployment."""
+        commit = get_commit_hash(description)
+        release_type = get_release_type(description)
+        if release_type == HerokuRelease.ReleaseType.DEPLOYMENT:
+            parent = get_release_parent(version)
         return super().create(
-            created_at=dateparser.parse(release_kwargs["created_at"]),
-            version=release_kwargs["version"],
+            created_at=dateparser.parse(created_at),
+            version=version,
             description=description,
             release_type=release_type,
             commit_hash=commit,
-            status=release_kwargs["status"],
+            parent=parent,
+            status=status,
             slug_id=slug["id"] if slug else None,
             raw=release_kwargs,
         )
@@ -50,9 +79,9 @@ class HerokuReleaseManager(models.Manager):
 class HerokuRelease(models.Model):
     class ReleaseType(models.TextChoices):
 
-        DEPLOYMENT = ("DEPLOYMENT", "Deployment")
-        ADD_ON = ("ADD_ON", "Adjust addons")
-        ENV_VARS = ("ENV_VARS", "Adjust env vars")
+        DEPLOYMENT = ("DEPLOYMENT", "Code deployment")
+        ADD_ON = ("ADD_ON", "Add-ons")
+        ENV_VARS = ("ENV_VARS", "Config vars")
         UNKNOWN = ("UNKNOWN", "Unknown")
 
     version = models.PositiveIntegerField(unique=True)

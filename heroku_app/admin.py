@@ -23,6 +23,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
     ordering = ("-version",)
     readonly_fields = (
         "version",
+        "release_type",
         "description",
         "release_note",
         "created_at",

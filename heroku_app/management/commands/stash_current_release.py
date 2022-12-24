@@ -34,13 +34,15 @@ class Command(BaseCommand):
         version = int(getenv("HEROKU_RELEASE_VERSION", "v0")[1:])
         description = getenv("HEROKU_SLUG_DESCRIPTION")
         try:
-            release = HerokuRelease.objects.create(
+            release: HerokuRelease = HerokuRelease.objects.create(
                 version=version,
                 created_at=created_at,
                 commit_hash=commit_hash,
                 description=description,
                 status="success",
             )
+            if release.is_deployment:
+                release.update_parent()
         except IntegrityError as ex:
             self.stderr.write(f"Error stashing current release: {ex}")
         else:
