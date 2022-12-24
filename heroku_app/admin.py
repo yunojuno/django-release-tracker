@@ -20,6 +20,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
     )
     list_filter = ("created_at", "release_type")
     exclude = ("raw", "slug_id")
+    ordering = ("-version",)
     readonly_fields = (
         "version",
         "description",
@@ -74,7 +75,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
             try:
                 obj.update_parent()
                 updated += 1
-            except Exception:
+            except Exception:  # noqa: B902
                 failed += 1
         if updated:
             self.message_user(
