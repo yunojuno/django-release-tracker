@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any
 
 import dateparser
@@ -34,7 +33,8 @@ class HerokuReleaseManager(models.Manager):
     def create(self, **release_kwargs: Any) -> HerokuRelease:
         description = release_kwargs["description"]
         release_type, commit = parse_description(description)
-        slug = release_kwargs["slug"]
+        # may not appear if we are creating from the env vars
+        slug = release_kwargs.get("slug", None)
         return super().create(
             created_at=dateparser.parse(release_kwargs["created_at"]),
             version=release_kwargs["version"],
