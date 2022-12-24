@@ -16,9 +16,9 @@ class Migration(migrations.Migration):
             field=models.CharField(
                 blank=True,
                 choices=[
-                    ("DEPLOYMENT", "Deployment"),
-                    ("ADD_ON", "Adjust addons"),
-                    ("ENV_VARS", "Adjust env vars"),
+                    ("DEPLOYMENT", "Code deployment"),
+                    ("ADD_ON", "Add-ons"),
+                    ("ENV_VARS", "Config vars"),
                     ("UNKNOWN", "Unknown"),
                 ],
                 default="UNKNOWN",
