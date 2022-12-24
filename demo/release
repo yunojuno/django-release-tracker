@@ -2,4 +2,4 @@
 # Heroku Release runner.
 # This script is run after every push, manual or otherwise.
 python manage.py migrate
-export
+python manage.py stash_current_release
