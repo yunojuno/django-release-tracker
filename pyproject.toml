@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "django-heroku-github-release-sync"
+name = "django-heroku-release-tracker"
 version = "0.1.0"
 description = "Django app for syncing Heroku and Github releases."
 license = "MIT"
@@ -22,7 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
-packages = [{ include = "release_notes" }]
+packages = [{ include = "heroku_app" }]
 
 [tool.poetry.dependencies]
 python = "^3.10"

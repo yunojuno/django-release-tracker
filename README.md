@@ -64,7 +64,7 @@ or
 
 ```
 $ poetry shell
-(release_notes) $ pytest
+(heroku_app) $ pytest
 ```
 
 The full suite is controlled by `tox`, which contains a set of
