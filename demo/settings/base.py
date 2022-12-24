@@ -22,6 +22,8 @@ INSTALLED_APPS = (
 
 MIDDLEWARE = [
     # default django middleware
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -47,7 +49,7 @@ TEMPLATES = [
 ]
 
 STATIC_URL = "/static/"
-STATIC_ROOT = path.join(PROJECT_DIR, "static")
+STATIC_ROOT = path.join(PROJECT_DIR, "staticfiles")
 
 SECRET_KEY = getenv("DJANGO_SECRET_KEY")
 
