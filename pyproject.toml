@@ -34,6 +34,7 @@ requests = "*"
 # optional - Heroku only
 psycopg2 = { version = "*", optional = true }
 gunicorn = { version = "*", optional = true }
+whitenoise = { version = "*", optional = true }
 
 [tool.poetry.dev-dependencies]
 black = "*"
@@ -53,7 +54,6 @@ pytest = "*"
 pytest-cov = "*"
 pytest-django = "*"
 tox = "*"
-whitenoise = { version = "*", optional = true }
 
 [tool.poetry.extras]
 heroku = ["psycopg2", "gunicorn", "whitenoise"]

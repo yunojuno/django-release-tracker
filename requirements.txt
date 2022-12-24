@@ -17,3 +17,4 @@ sqlparse==0.4.3; python_version >= "3.8"
 tzdata==2022.7; sys_platform == "win32" and python_version >= "3.8" and platform_system == "Windows" and (python_version >= "3.7" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.7")
 tzlocal==4.2; python_version >= "3.7"
 urllib3==1.26.13; python_version >= "3.7" and python_full_version < "3.0.0" and python_version < "4" or python_version >= "3.7" and python_version < "4" and python_full_version >= "3.6.0"
+whitenoise==6.2.0; python_version >= "3.7"
