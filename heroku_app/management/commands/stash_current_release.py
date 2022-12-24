@@ -41,7 +41,7 @@ class Command(BaseCommand):
                 description=description,
                 status="success",
             )
-        except IntegrityError:
-            logger.exception("Error stashing current release")
+        except IntegrityError as ex:
+            self.stderr.write(f"Error stashing current release: {ex}")
         else:
             self.stdout.write(f"Created new release: {release}")
