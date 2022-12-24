@@ -1,10 +1,8 @@
 import logging
-from os import getenv
 
 import requests
 
-HEROKU_API_TOKEN = getenv("HEROKU_API_TOKEN")
-HEROKU_APP_NAME = getenv("HEROKU_APP_NAME")
+from .settings import HEROKU_API_TOKEN, HEROKU_APP_NAME
 
 logger = logging.getLogger("__name__")
 
@@ -20,7 +18,9 @@ def crawl(max_count: int, range_start: str = "id ..", page_size: int = 1000) -> 
 
 
 def _releases(range: str) -> requests.Response:
-    return requests.get(
+    if not HEROKU_API_TOKEN:
+        raise Exception("Missing HEROKU_API_TOKEN config var.")
+    response = requests.get(
         f"https://api.heroku.com/apps/{HEROKU_APP_NAME}/releases/",
         headers={
             "Range": range,
@@ -28,3 +28,5 @@ def _releases(range: str) -> requests.Response:
             "Authorization": f"Bearer {HEROKU_API_TOKEN}",
         },
     )
+    response.raise_for_status()
+    return response
