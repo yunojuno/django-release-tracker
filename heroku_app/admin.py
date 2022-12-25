@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.http import HttpRequest
 from django.utils.safestring import mark_safe
 
-from .github import get_compare_url
+from .github import create_github_release, get_compare_url
 from .models import HerokuRelease, HerokuReleaseQuerySet
 
 
@@ -33,7 +33,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "status",
         "_raw",
     )
-    actions = ("set_parent_releases", "set_release_notes")
+    actions = ("set_parent_releases", "set_release_notes", "push_to_github")
 
     @admin.display(description="Release note", boolean=True)
     def has_release_note(self, obj: HerokuRelease) -> bool:
@@ -117,3 +117,13 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
             self.message_user(
                 request, f"Failed to update {failed}  Heroku releases.", "error"
             )
+
+    @admin.action(description="Generate Github release")
+    def push_to_github(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
+        for obj in qs.order_by("id"):
+            if not obj.is_deployment:
+                continue
+            if not obj.parent:
+                continue
+            response = create_github_release(obj)
+            print(response)

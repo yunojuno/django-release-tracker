@@ -125,6 +125,12 @@ class HerokuRelease(models.Model):
         return self.release_type == HerokuRelease.ReleaseType.DEPLOYMENT
 
     @property
+    def tag_name(self) -> str:
+        if self.is_deployment:
+            return f"v{self.version}"
+        return ""
+
+    @property
     def base_head(self) -> str:
         """Form the base...head reference used to fetch diff from Github."""
         if not self.commit_hash:

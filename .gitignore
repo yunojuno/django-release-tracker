@@ -2,6 +2,7 @@
 *.egg-info
 *.bak
 .coverage
+.env
 .tox
 .venv
 demo.db
