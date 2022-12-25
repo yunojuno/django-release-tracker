@@ -61,8 +61,11 @@ class HerokuReleaseManager(models.Manager):
         """Create a new release and set the parent property if a deployment."""
         commit = get_commit_hash(description)
         release_type = get_release_type(description)
-        if release_type == HerokuRelease.ReleaseType.DEPLOYMENT:
-            parent = get_release_parent(version)
+        parent = (
+            get_release_parent(version)
+            if release_type == HerokuRelease.ReleaseType.DEPLOYMENT
+            else None
+        )
         return super().create(
             created_at=dateparser.parse(created_at),
             version=version,
