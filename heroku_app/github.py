@@ -81,6 +81,8 @@ def create_github_release(release: HerokuRelease) -> dict:
         "tag_name": release.tag_name,
         "name": f"Release {release.tag_name}",
         "target_commitish": release.commit_hash,
+        "body": release.release_note,
+        "generate_release_notes": True,
     }
     response = requests.post(
         url,
