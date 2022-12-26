@@ -8,6 +8,7 @@ from django.db import models
 from requests.exceptions import HTTPError
 
 from . import github
+from .api import get_slug
 
 logger = logging.getLogger(__name__)
 
@@ -61,15 +62,25 @@ class HerokuReleaseManager(models.Manager):
         """Create a new release and set the parent property if a deployment."""
         commit = get_commit_hash(description)
         release_type = get_release_type(description)
+        release_note = ""
         parent = (
             get_release_parent(version)
             if release_type == HerokuRelease.ReleaseType.DEPLOYMENT
             else None
         )
+        if release_type == HerokuRelease.ReleaseType.DEPLOYMENT and slug:
+            slug.update(get_slug(slug["id"]))
+            release_note = slug["commit_description"]
+            release_kwargs["slug_size"] = slug["size"]
+            release_kwargs["slug"] = slug
+            # override short hash with the full-length hash as Github
+            # needs this for some API operations.
+            commit = slug["commit"]
         return super().create(
             created_at=dateparser.parse(created_at),
             version=version,
             description=description,
+            release_note=release_note,
             release_type=release_type,
             commit_hash=commit,
             parent=parent,
@@ -139,7 +150,7 @@ class HerokuRelease(models.Model):
             return ""
         if not self.parent.commit_hash:
             return ""
-        return f"{self.parent.commit_hash}...{self.commit_hash}"
+        return f"{self.parent.commit_hash[:6]}...{self.commit_hash[:6]}"
 
     def get_release_note(self) -> str:
         """Fetch release note from Github."""
