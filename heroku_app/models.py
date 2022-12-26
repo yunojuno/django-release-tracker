@@ -7,8 +7,8 @@ import dateparser
 from django.db import models
 from requests.exceptions import HTTPError
 
+from . import api as heroku_api
 from . import github
-from .api import get_slug
 
 logger = logging.getLogger(__name__)
 
@@ -178,3 +178,21 @@ class HerokuRelease(models.Model):
     def update_parent(self) -> None:
         self.parent = self.get_parent()
         self.save(update_fields=["parent"])
+
+    def pull(self) -> None:
+        """Pull most recent release data from Heroku."""
+        if not self.version:
+            raise Exception("Missing Heroku release version.")
+        # release = heroku_api.get_release(self.version)
+        slug = heroku_api.get_slug(str(self.slug_id))
+        self.commit_hash = slug["commit"]
+        self.release_note = slug["commit_description"]
+
+    def push(self) -> None:
+        """Push release data to Github."""
+        raise NotImplementedError
+
+    def sync(self) -> None:
+        """Pull from Heroku and push to Github."""
+        self.pull()
+        self.push()
