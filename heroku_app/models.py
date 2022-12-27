@@ -73,44 +73,44 @@ class HerokuReleaseManager(models.Manager):
         else:
             return release
 
-    def create(
-        self,
-        description: str,
-        version: int,
-        created_at: str,
-        status: str,
-        slug: dict | None = None,
-        **release_kwargs: Any,
-    ) -> HerokuRelease:
-        """Create a new release and set the parent property if a deployment."""
-        commit = get_commit_hash(description)
-        release_type = get_release_type(description)
-        release_note = ""
-        parent = (
-            get_release_parent(version)
-            if release_type == HerokuRelease.ReleaseType.DEPLOYMENT
-            else None
-        )
-        if release_type == HerokuRelease.ReleaseType.DEPLOYMENT and slug:
-            slug.update(get_slug(slug["id"]))
-            release_note = slug["commit_description"]
-            release_kwargs["slug_size"] = slug["size"]
-            release_kwargs["slug"] = slug
-            # override short hash with the full-length hash as Github
-            # needs this for some API operations.
-            commit = slug["commit"]
-        return super().create(
-            created_at=dateparser.parse(created_at),
-            version=version,
-            description=description,
-            release_note=release_note,
-            release_type=release_type,
-            commit_hash=commit,
-            parent=parent,
-            status=status,
-            slug_id=slug["id"] if slug else None,
-            raw=release_kwargs,
-        )
+    # def create(
+    #     self,
+    #     description: str,
+    #     version: int,
+    #     created_at: str,
+    #     status: str,
+    #     slug: dict | None = None,
+    #     **release_kwargs: Any,
+    # ) -> HerokuRelease:
+    #     """Create a new release and set the parent property if a deployment."""
+    #     commit = get_commit_hash(description)
+    #     release_type = get_release_type(description)
+    #     release_note = ""
+    #     parent = (
+    #         get_release_parent(version)
+    #         if release_type == HerokuRelease.ReleaseType.DEPLOYMENT
+    #         else None
+    #     )
+    #     if release_type == HerokuRelease.ReleaseType.DEPLOYMENT and slug:
+    #         slug.update(get_slug(slug["id"]))
+    #         release_note = slug["commit_description"]
+    #         release_kwargs["slug_size"] = slug["size"]
+    #         release_kwargs["slug"] = slug
+    #         # override short hash with the full-length hash as Github
+    #         # needs this for some API operations.
+    #         commit = slug["commit"]
+    #     return super().create(
+    #         created_at=dateparser.parse(created_at),
+    #         version=version,
+    #         description=description,
+    #         release_note=release_note,
+    #         release_type=release_type,
+    #         commit_hash=commit,
+    #         parent=parent,
+    #         status=status,
+    #         slug_id=slug["id"] if slug else None,
+    #         raw=release_kwargs,
+    #     )
 
 
 class HerokuRelease(models.Model):
