@@ -5,11 +5,17 @@ from typing import Any
 
 import dateparser
 import requests
-from django.db import models
+from django.db import IntegrityError, models
 from requests.exceptions import HTTPError
 
 from . import api as heroku_api
 from . import github
+from .settings import (
+    HEROKU_RELEASE_CREATED_AT,
+    HEROKU_RELEASE_VERSION,
+    HEROKU_SLUG_COMMIT,
+    HEROKU_SLUG_DESCRIPTION,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +57,22 @@ class HerokuReleaseQuerySet(models.QuerySet):
 
 
 class HerokuReleaseManager(models.Manager):
+
+    def auto_create(self) -> HerokuRelease:
+        """Create a new release from the current running dyno."""
+        try:
+            release: HerokuRelease = self.create(
+                version=HEROKU_RELEASE_VERSION,
+                created_at=HEROKU_RELEASE_CREATED_AT,
+                commit_hash=HEROKU_SLUG_COMMIT,
+                description=HEROKU_SLUG_DESCRIPTION,
+                status="success",
+            )
+        except IntegrityError as ex:
+            logger.exception("Error auto-creating a new release")
+        else:
+            return release
+
     def create(
         self,
         description: str,

@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.http import HttpRequest
 from django.utils.safestring import mark_safe
 
-# from .github import create_github_release, get_compare_url
+from .github import get_compare_url
 from .models import HerokuRelease, HerokuReleaseQuerySet
 
 
@@ -121,9 +121,4 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
     @admin.action(description="Generate Github release")
     def push_to_github(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
         for obj in qs.order_by("id"):
-            if not obj.is_deployment:
-                continue
-            if not obj.parent:
-                continue
-            response = create_github_release(obj)
-            print(response)
+            obj.push()
