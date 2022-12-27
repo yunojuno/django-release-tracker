@@ -221,14 +221,14 @@ class HerokuRelease(models.Model):
         if not self.version:
             raise Exception("Missing Heroku release version.")
         self.raw = heroku_api.get_release(self.version)
+        self.save(update_fields=["raw"])
         if not (release_slug := self.raw["slug"]):
-            self.save(update_fields=["raw"])
             return
         self.slug_id = release_slug["id"]
         slug = heroku_api.get_slug(self.slug_id)
         self.commit_hash = slug["commit"]
         self.release_note = slug["commit_description"]
-        self.save(update_fields=["raw", "slug_id", "commit_hash", "release_note"])
+        self.save(update_fields=["slug_id", "commit_hash", "release_note"])
 
     def push(self) -> None:
         """Push release data to Github."""
@@ -238,7 +238,7 @@ class HerokuRelease(models.Model):
             github.create_release(**self.github_release_data)
         except requests.HTTPError as ex:
             logger.error("Error pushing release to github")
-            logger.error(github.format_api_errors(ex.response))
+            logger.error(github.format_api_errors(ex))
 
     def sync(self) -> None:
         """Pull from Heroku and push to Github."""

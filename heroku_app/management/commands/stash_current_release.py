@@ -20,8 +20,11 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         try:
+            self.stdout.write("Creating new HerokuRelease object")
             release: HerokuRelease = HerokuRelease.objects.auto_create()
+            self.stdout.write("Syncing release with Github")
             release.sync()
+            self.stdout.write("Updating release parent")
             release.update_parent()
         except IntegrityError as ex:
             self.stderr.write(f"Error stashing current release: {ex}")

@@ -20,13 +20,14 @@ GITHUB_API_RELEASES_URL = f"{GITHUB_API_REPO_URL}/releases"
 logger = logging.getLogger(__name__)
 
 
-def format_api_errors(response: requests.Response) -> str:
+def format_api_errors(ex: requests.HTTPError) -> str:
     """
     Format error messages.
 
     See https://docs.github.com/en/rest/overview/resources-in-the-rest-api?apiVersion=2022-11-28#client-errors
 
     """
+    response = ex.response
 
     def _400() -> str:
         try:
@@ -51,6 +52,8 @@ def format_api_errors(response: requests.Response) -> str:
         return _400()
     if response.status_code == 422:
         return _422()
+    if response.status_code == 500:
+        return f"Unknown server error: {ex}"
     return ""
 
 
