@@ -1,4 +1,5 @@
 import logging
+from uuid import UUID
 
 import requests
 
@@ -35,5 +36,5 @@ def get_release(version: str) -> dict:
     return _get(f"releases/{version}").json()
 
 
-def get_slug(slug_id: str) -> dict:
+def get_slug(slug_id: UUID) -> dict:
     return _get(f"slugs/{slug_id}").json()

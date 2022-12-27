@@ -19,6 +19,7 @@ import logging
 from os import getenv
 from typing import Any
 
+import requests
 from django.core.management import BaseCommand
 from django.db import IntegrityError
 
@@ -43,7 +44,10 @@ class Command(BaseCommand):
             )
             if release.is_deployment:
                 release.update_parent()
+            release.push()
         except IntegrityError as ex:
             self.stderr.write(f"Error stashing current release: {ex}")
+        except requests.HTTPError as ex:
+            self.stderr.write(f"Error pushing current release to github: {ex}")
         else:
             self.stdout.write(f"Created new release: {release}")

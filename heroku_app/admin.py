@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.http import HttpRequest
 from django.utils.safestring import mark_safe
 
-from .github import create_github_release, get_compare_url
+# from .github import create_github_release, get_compare_url
 from .models import HerokuRelease, HerokuReleaseQuerySet
 
 

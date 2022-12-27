@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 import dateparser
+import requests
 from django.db import models
 from requests.exceptions import HTTPError
 
@@ -179,18 +180,34 @@ class HerokuRelease(models.Model):
         self.parent = self.get_parent()
         self.save(update_fields=["parent"])
 
+    @property
+    def github_release_data(self) -> dict:
+        """Format the data required for the release API call."""
+        return {
+            "tag_name": self.tag_name,
+            "commit_hash": self.commit_hash,
+            "body": self.release_note,
+            "generate_release_notes": True,
+        }
+
     def pull(self) -> None:
         """Pull most recent release data from Heroku."""
         if not self.version:
             raise Exception("Missing Heroku release version.")
-        # release = heroku_api.get_release(self.version)
-        slug = heroku_api.get_slug(str(self.slug_id))
+        if not self.slug_id:
+            raise Exception("Missing Heroku slug id")
+        slug = heroku_api.get_slug(self.slug_id)
         self.commit_hash = slug["commit"]
         self.release_note = slug["commit_description"]
+        self.save(update_fields=["commit_hash", "release_note"])
 
     def push(self) -> None:
         """Push release data to Github."""
-        raise NotImplementedError
+        try:
+            github.create_release(**self.github_release_data)
+        except requests.HTTPError as ex:
+            logger.error("Error pushing release to github")
+            logger.error(github.format_api_errors(ex.response))
 
     def sync(self) -> None:
         """Pull from Heroku and push to Github."""
