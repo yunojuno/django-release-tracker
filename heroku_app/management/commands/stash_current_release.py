@@ -21,9 +21,8 @@ class Command(BaseCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         try:
             release: HerokuRelease = HerokuRelease.objects.auto_create()
-            if release.is_deployment:
-                release.update_parent()
-            release.push()
+            release.sync()
+            release.update_parent()
         except IntegrityError as ex:
             self.stderr.write(f"Error stashing current release: {ex}")
         except requests.HTTPError as ex:

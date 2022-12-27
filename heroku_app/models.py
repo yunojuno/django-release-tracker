@@ -57,7 +57,6 @@ class HerokuReleaseQuerySet(models.QuerySet):
 
 
 class HerokuReleaseManager(models.Manager):
-
     def auto_create(self) -> HerokuRelease:
         """Create a new release from the current running dyno."""
         try:
@@ -191,6 +190,8 @@ class HerokuRelease(models.Model):
 
     def get_parent(self) -> HerokuRelease | None:
         """Return first deployment before this one."""
+        if not self.is_deployment:
+            return None
         return (
             HerokuRelease.objects.filter(version__lt=self.version)
             .deployments()
@@ -216,12 +217,14 @@ class HerokuRelease(models.Model):
         """Pull most recent release data from Heroku."""
         if not self.version:
             raise Exception("Missing Heroku release version.")
-        if not self.slug_id:
-            raise Exception("Missing Heroku slug id")
+        release = heroku_api.get_release(self.version)
+        if not (release_slug := release["slug"]):
+            return
+        self.slug_id = release_slug["id"]
         slug = heroku_api.get_slug(self.slug_id)
         self.commit_hash = slug["commit"]
         self.release_note = slug["commit_description"]
-        self.save(update_fields=["commit_hash", "release_note"])
+        self.save(update_fields=["slug_id", "commit_hash", "release_note"])
 
     def push(self) -> None:
         """Push release data to Github."""
