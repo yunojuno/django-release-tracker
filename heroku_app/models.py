@@ -30,6 +30,8 @@ def get_release_type(description: str) -> str:
         return str(HerokuRelease.ReleaseType.ENV_VARS)
     if description.lower().startswith(("add", "attach", "detach")):
         return str(HerokuRelease.ReleaseType.ADD_ON)
+    if description.lower().endswith("add-on"):
+        return str(HerokuRelease.ReleaseType.ADD_ON)
     return str(HerokuRelease.ReleaseType.UNKNOWN)
 
 
@@ -65,6 +67,7 @@ class HerokuReleaseManager(models.Manager):
                 created_at=HEROKU_RELEASE_CREATED_AT,
                 commit_hash=HEROKU_SLUG_COMMIT,
                 description=HEROKU_SLUG_DESCRIPTION,
+                release_type=get_release_type(HEROKU_SLUG_DESCRIPTION),
                 status="success",
             )
         except IntegrityError as ex:
@@ -217,17 +220,20 @@ class HerokuRelease(models.Model):
         """Pull most recent release data from Heroku."""
         if not self.version:
             raise Exception("Missing Heroku release version.")
-        release = heroku_api.get_release(self.version)
-        if not (release_slug := release["slug"]):
+        self.raw = heroku_api.get_release(self.version)
+        if not (release_slug := self.raw["slug"]):
+            self.save(update_fields=["raw"])
             return
         self.slug_id = release_slug["id"]
         slug = heroku_api.get_slug(self.slug_id)
         self.commit_hash = slug["commit"]
         self.release_note = slug["commit_description"]
-        self.save(update_fields=["slug_id", "commit_hash", "release_note"])
+        self.save(update_fields=["raw", "slug_id", "commit_hash", "release_note"])
 
     def push(self) -> None:
         """Push release data to Github."""
+        if not self.tag_name:
+            raise Exception(f"{self} is missing tag_name property.")
         try:
             github.create_release(**self.github_release_data)
         except requests.HTTPError as ex:
