@@ -40,8 +40,12 @@ def format_api_errors(response: requests.Response) -> str:
             return "\n".join(
                 [f'E {e["resource"]}.{e["field"]}: {e["code"]}' for e in errors]
             )
+        except KeyError:
+            logger.exception("Error parsing Github 422 response JSON:")
+            logger.error(response.json())
         except Exception:
             logger.exception("Error parsing Github response")
+            logger.error(response.text)
 
     if response.status_code == 400:
         return _400()
