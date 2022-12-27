@@ -10,10 +10,14 @@ logger = logging.getLogger("__name__")
 API_PREFIX = f"https://api.heroku.com/apps/{HEROKU_APP_NAME}/"
 
 
-def _get(url: str, **headers: dict[str, str]) -> requests.Response:
-    """Call the platform api with a GET request."""
+def check_auth() -> None:
     if not HEROKU_API_TOKEN:
         raise Exception("Missing HEROKU_API_TOKEN config var.")
+
+
+def _get(url: str, **headers: dict[str, str]) -> requests.Response:
+    """Call the platform api with a GET request."""
+    check_auth()
     headers.setdefault("Authorization", f"Bearer {HEROKU_API_TOKEN}")
     headers.setdefault("Accept", "Accept: application/vnd.heroku+json; version=3")
     response = requests.get(f"{API_PREFIX}{url}", headers=headers)

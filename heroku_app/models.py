@@ -217,10 +217,23 @@ class HerokuRelease(models.Model):
         }
 
     def pull(self) -> None:
-        """Pull most recent release data from Heroku."""
+        """
+        Pull most recent release data from Heroku.
+
+        This method pulls in the latest release data from the Heroku
+        API, and then pulls the related Slug info if appropriate. It
+        updates the commit and release note from the Slug. It updates
+        the raw attribute with the full Slug data.
+
+        Fields that are updated by this method:
+
+            "raw", "slug_id", "commit_hash", "release_note"
+
+        """
         if not self.version:
             raise Exception("Missing Heroku release version.")
         self.raw = heroku_api.get_release(self.version)
+        self.created_at = dateparser.parse(self.raw["created_at"])
         if not (release_slug := self.raw["slug"]):
             self.save(update_fields=["raw"])
             return
@@ -232,9 +245,20 @@ class HerokuRelease(models.Model):
         self.save(update_fields=["raw", "slug_id", "commit_hash", "release_note"])
 
     def push(self) -> None:
-        """Push release data to Github."""
+        """
+        Push release data to Github.
+
+        Calls the Github create release API, using the current Heroku
+        release data - tag_name, commit_hash, release_note. It passes
+        the generate_release_notes param so that Github will create the
+        release from all commits since the last (Github) release.
+
+        Raises AttributeError if the tag_name is not set as without this
+        it's impossible to create a release.
+
+        """
         if not self.tag_name:
-            raise Exception(f"{self} is missing tag_name property.")
+            raise AttributeError(f"{self} is missing tag_name property.")
         try:
             github.create_release(**self.github_release_data)
         except requests.HTTPError as ex:
@@ -242,6 +266,11 @@ class HerokuRelease(models.Model):
             logger.error(github.format_api_errors(ex))
 
     def sync(self) -> None:
-        """Pull from Heroku and push to Github."""
+        """
+        Pull from Heroku and push to Github.
+
+        The minimum requirement here is a version number.
+
+        """
         self.pull()
         self.push()
