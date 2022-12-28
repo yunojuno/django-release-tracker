@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("heroku_app", "0002_herokurelease_parent"),
+        ("release_tracker", "0002_herokurelease_parent"),
     ]
 
     operations = [

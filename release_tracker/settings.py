@@ -1,7 +1,5 @@
 from os import getenv
 
-from dateparser import parse as date_parse
-
 # Token used with the Platform API
 HEROKU_API_TOKEN = getenv("HEROKU_API_TOKEN")
 

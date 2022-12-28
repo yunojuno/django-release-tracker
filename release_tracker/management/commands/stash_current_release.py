@@ -12,7 +12,7 @@ import requests
 from django.core.management import BaseCommand
 from django.db import IntegrityError
 
-from heroku_app.models import HerokuRelease
+from release_tracker.models import HerokuRelease
 
 logger = logging.getLogger(__name__)
 

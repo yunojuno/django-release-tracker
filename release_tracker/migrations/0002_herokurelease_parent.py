@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("heroku_app", "0001_initial"),
+        ("release_tracker", "0001_initial"),
     ]
 
     operations = [
@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
             field=models.OneToOneField(
                 null=True,
                 on_delete=django.db.models.deletion.SET_NULL,
-                to="heroku_app.herokurelease",
+                to="release_tracker.herokurelease",
             ),
         ),
     ]

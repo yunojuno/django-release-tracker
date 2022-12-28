@@ -4,8 +4,8 @@ from django.core.management import BaseCommand
 from django.core.management.base import CommandParser
 from django.db import IntegrityError
 
-from heroku_app.api import crawl
-from heroku_app.models import HerokuRelease
+from release_tracker.heroku import crawl
+from release_tracker.models import HerokuRelease
 
 
 class Command(BaseCommand):
@@ -24,6 +24,6 @@ class Command(BaseCommand):
         HerokuRelease.objects.all().values_list("version", flat=True)
         for release in new_releases:
             try:
-                HerokuRelease.objects.create(**release)
+                HerokuRelease.objects.create_from_api(**release)
             except IntegrityError:
                 self.stderr.write(f"Error creating new release:\n{release}")

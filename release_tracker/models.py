@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from uuid import UUID
 
 import dateparser
 import requests
 from django.db import IntegrityError, models
+from django.utils.timezone import now as tz_now
 from requests.exceptions import HTTPError
 
-from . import api as heroku_api
-from . import github
+from . import github, heroku
 from .settings import (
     HEROKU_RELEASE_CREATED_AT,
     HEROKU_RELEASE_VERSION,
@@ -70,49 +71,49 @@ class HerokuReleaseManager(models.Manager):
                 release_type=get_release_type(HEROKU_SLUG_DESCRIPTION),
                 status="success",
             )
-        except IntegrityError as ex:
+        except IntegrityError:
             logger.exception("Error auto-creating a new release")
         else:
             return release
 
-    # def create(
-    #     self,
-    #     description: str,
-    #     version: int,
-    #     created_at: str,
-    #     status: str,
-    #     slug: dict | None = None,
-    #     **release_kwargs: Any,
-    # ) -> HerokuRelease:
-    #     """Create a new release and set the parent property if a deployment."""
-    #     commit = get_commit_hash(description)
-    #     release_type = get_release_type(description)
-    #     release_note = ""
-    #     parent = (
-    #         get_release_parent(version)
-    #         if release_type == HerokuRelease.ReleaseType.DEPLOYMENT
-    #         else None
-    #     )
-    #     if release_type == HerokuRelease.ReleaseType.DEPLOYMENT and slug:
-    #         slug.update(get_slug(slug["id"]))
-    #         release_note = slug["commit_description"]
-    #         release_kwargs["slug_size"] = slug["size"]
-    #         release_kwargs["slug"] = slug
-    #         # override short hash with the full-length hash as Github
-    #         # needs this for some API operations.
-    #         commit = slug["commit"]
-    #     return super().create(
-    #         created_at=dateparser.parse(created_at),
-    #         version=version,
-    #         description=description,
-    #         release_note=release_note,
-    #         release_type=release_type,
-    #         commit_hash=commit,
-    #         parent=parent,
-    #         status=status,
-    #         slug_id=slug["id"] if slug else None,
-    #         raw=release_kwargs,
-    #     )
+    def create_from_api(
+        self,
+        description: str,
+        version: int,
+        created_at: str,
+        status: str,
+        slug: dict | None = None,
+        **release_kwargs: Any,
+    ) -> HerokuRelease:
+        """Create a new release from the Heroku API response."""
+        commit = get_commit_hash(description)
+        release_type = get_release_type(description)
+        # release_note = ""
+        parent = (
+            get_release_parent(version)
+            if release_type == HerokuRelease.ReleaseType.DEPLOYMENT
+            else None
+        )
+        # if release_type == HerokuRelease.ReleaseType.DEPLOYMENT and slug:
+        #     slug.update(get_slug(slug["id"]))
+        #     release_note = slug["commit_description"]
+        #     release_kwargs["slug_size"] = slug["size"]
+        #     release_kwargs["slug"] = slug
+        #     # override short hash with the full-length hash as Github
+        #     # needs this for some API operations.
+        #     commit = slug["commit"]
+        return super().create(
+            created_at=dateparser.parse(created_at),
+            version=version,
+            description=description,
+            # release_note=release_note,
+            release_type=release_type,
+            commit_hash=commit,
+            parent=parent,
+            status=status,
+            slug_id=slug["id"] if slug else None,
+            heroku_release=release_kwargs,
+        )
 
 
 class HerokuRelease(models.Model):
@@ -125,21 +126,52 @@ class HerokuRelease(models.Model):
 
     version = models.PositiveIntegerField(unique=True)
 
-    description = models.TextField(blank=True, default="")
+    description = models.TextField(
+        blank=True, default="", help_text="Heroku release description (auto-generated)."
+    )
 
     slug_id = models.UUIDField(blank=True, null=True)
 
     commit_hash = models.CharField(blank=True, max_length=40)
 
-    created_at = models.DateTimeField()
+    created_at = models.DateTimeField(
+        blank=True, null=True, help_text="When the release was created by Heroku."
+    )
 
-    raw = models.JSONField(null=True, blank=True)
+    pulled_at = models.DateTimeField(
+        blank=True, null=True, help_text="When the release data was pulled from Heroku"
+    )
+
+    pushed_at = models.DateTimeField(
+        blank=True, null=True, help_text="When the release data was pushed to Github."
+    )
+
+    heroku_release = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Release as represented by the Heroku platform API.",
+    )
+
+    github_release = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Release as represented by the Github REST API.",
+    )
 
     status = models.CharField(max_length=100)
 
-    parent = models.OneToOneField("self", null=True, on_delete=models.SET_NULL)
+    parent = models.OneToOneField(
+        "self",
+        null=True,
+        on_delete=models.SET_NULL,
+        help_text="The previous release - used to generate changelog.",
+    )
 
-    release_note = models.TextField(blank=True, default="")
+    release_note = models.TextField(
+        blank=True,
+        default="",
+        help_text="The release note pulled from the Heroku platform API.",
+    )
 
     release_type = models.CharField(
         max_length=10,
@@ -177,20 +209,6 @@ class HerokuRelease(models.Model):
             return ""
         return f"{self.parent.commit_hash[:6]}...{self.commit_hash[:6]}"
 
-    def get_release_note(self) -> str:
-        """Fetch release note from Github."""
-        if not self.base_head:
-            return ""
-        try:
-            return github.get_release_note(self.base_head)
-        except HTTPError:
-            logger.exception("Error retrieving release note")
-        return ""
-
-    def update_release_note(self) -> None:
-        self.release_note = self.get_release_note()
-        self.save(update_fields=["release_note"])
-
     def get_parent(self) -> HerokuRelease | None:
         """Return first deployment before this one."""
         if not self.is_deployment:
@@ -205,6 +223,24 @@ class HerokuRelease(models.Model):
     def update_parent(self) -> None:
         self.parent = self.get_parent()
         self.save(update_fields=["parent"])
+
+    @property
+    def heroku_release_id(self) -> UUID | None:
+        if not self.heroku_release:
+            return None
+        return UUID(self.heroku_release["id"])
+
+    @property
+    def github_release_id(self) -> int | None:
+        if not self.github_release:
+            return None
+        return int(self.github_release["id"])
+
+    @property
+    def github_release_url(self) -> str | None:
+        if not self.github_release:
+            return None
+        return self.github_release["html_url"]
 
     @property
     def github_release_data(self) -> dict:
@@ -223,28 +259,38 @@ class HerokuRelease(models.Model):
         This method pulls in the latest release data from the Heroku
         API, and then pulls the related Slug info if appropriate. It
         updates the commit and release note from the Slug. It updates
-        the raw attribute with the full Slug data.
+        the heroku_release attribute with the full Slug data.
 
         Fields that are updated by this method:
 
-            "raw", "slug_id", "commit_hash", "release_note"
+            "heroku_release", "slug_id", "commit_hash", "release_note"
 
         """
         if not self.version:
             raise Exception("Missing Heroku release version.")
-        self.raw = heroku_api.get_release(self.version)
-        self.created_at = dateparser.parse(self.raw["created_at"])
-        if not (release_slug := self.raw["slug"]):
-            self.save(update_fields=["raw"])
+        self.heroku_release = heroku.get_release(self.version)
+        self.created_at = dateparser.parse(self.heroku_release["created_at"])
+        if not (release_slug := self.heroku_release["slug"]):
+            self.save(update_fields=["heroku_release"])
             return
         self.slug_id = release_slug["id"]
-        slug = heroku_api.get_slug(self.slug_id)
-        self.raw.update(slug)
+        slug = heroku.get_slug(self.slug_id)
+        self.heroku_release.update(slug)
         self.commit_hash = slug["commit"]
         self.release_note = slug["commit_description"]
-        self.save(update_fields=["raw", "slug_id", "commit_hash", "release_note"])
+        self.status = self.heroku_release["status"]
+        self.pulled_at = tz_now()
+        self.save(
+            update_fields=[
+                "pulled_at",
+                "heroku_release",
+                "slug_id",
+                "commit_hash",
+                "release_note",
+            ]
+        )
 
-    def push(self) -> None:
+    def push(self) -> bool:
         """
         Push release data to Github.
 
@@ -256,14 +302,22 @@ class HerokuRelease(models.Model):
         Raises AttributeError if the tag_name is not set as without this
         it's impossible to create a release.
 
+        Logs and re-raises HTTPError if the API request failed.
+
         """
         if not self.tag_name:
             raise AttributeError(f"{self} is missing tag_name property.")
         try:
-            github.create_release(**self.github_release_data)
+            release = github.create_release(**self.github_release_data)
         except requests.HTTPError as ex:
             logger.error("Error pushing release to github")
             logger.error(github.format_api_errors(ex))
+            raise
+        else:
+            self.github_release = release
+            self.pushed_at = tz_now()
+            self.save(update_fields=["pushed_at", "github_release"])
+        return True
 
     def sync(self) -> None:
         """
