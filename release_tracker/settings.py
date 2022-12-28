@@ -2,7 +2,7 @@ import datetime
 from os import getenv
 
 import dateparser
-from django.utils.functional import SimpleLazyObject
+from django.utils.functional import SimpleLazyObject, lazy
 
 # Token used with the Platform API
 HEROKU_API_TOKEN = getenv("HEROKU_API_TOKEN")
@@ -21,8 +21,8 @@ def _created_at() -> datetime.datetime | None:
 
 HEROKU_APP_ID = getenv("HEROKU_APP_ID")
 HEROKU_APP_NAME = getenv("HEROKU_APP_NAME")
-HEROKU_RELEASE_CREATED_AT = SimpleLazyObject(_created_at)
-HEROKU_RELEASE_VERSION = SimpleLazyObject(_release_version)
+HEROKU_RELEASE_CREATED_AT = lazy(_created_at)
+HEROKU_RELEASE_VERSION = lazy(_release_version)
 HEROKU_SLUG_COMMIT = getenv("HEROKU_SLUG_COMMIT")
 HEROKU_SLUG_DESCRIPTION = getenv("HEROKU_SLUG_DESCRIPTION")
 
