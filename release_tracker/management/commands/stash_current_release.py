@@ -22,13 +22,16 @@ class Command(BaseCommand):
         try:
             self.stdout.write("Creating new HerokuRelease object")
             release: HerokuRelease = HerokuRelease.objects.auto_create()
-            self.stdout.write("Syncing release with Github")
+            self.stdout.write(f"Syncing {release} with Github")
             release.sync()
             self.stdout.write("Updating release parent")
             release.update_parent()
         except IntegrityError as ex:
             self.stderr.write(f"Error stashing current release: {ex}")
         except requests.HTTPError as ex:
+            self.stderr.write(f"Error pushing current release to github: {ex}")
+        except Exception as ex:
+            logger.exception("Error ")
             self.stderr.write(f"Error pushing current release to github: {ex}")
         else:
             self.stdout.write(f"Created new release: {release}")
