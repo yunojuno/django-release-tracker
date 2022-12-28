@@ -64,7 +64,7 @@ class HerokuReleaseManager(models.Manager):
         """Create a new release from the current running dyno."""
         try:
             release: HerokuRelease = self.create(
-                version=HEROKU_RELEASE_VERSION,
+                version=int(HEROKU_RELEASE_VERSION),
                 created_at=HEROKU_RELEASE_CREATED_AT,
                 commit_hash=HEROKU_SLUG_COMMIT,
                 description=HEROKU_SLUG_DESCRIPTION,
