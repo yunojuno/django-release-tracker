@@ -2,10 +2,10 @@ import datetime
 from os import getenv
 
 import dateparser
-from django.utils.functional import SimpleLazyObject, lazystr
 
 # Token used with the Platform API
 HEROKU_API_TOKEN = getenv("HEROKU_API_TOKEN")
+
 
 # Values set by dyno runtime metadata
 def _release_version() -> int | None:

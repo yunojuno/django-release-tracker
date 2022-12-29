@@ -30,7 +30,7 @@ class Command(BaseCommand):
             self.stderr.write(f"Error stashing current release: {ex}")
         except requests.HTTPError as ex:
             self.stderr.write(f"Error pushing current release to github: {ex}")
-        except Exception as ex:
+        except Exception as ex:  # noqa: B902
             logger.exception("Error ")
             self.stderr.write(f"Error pushing current release to github: {ex}")
         else:

@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 def get_release_type(description: str) -> str:
     """Extract release type from description."""
+    if not description:
+        raise ValueError("Missing description.")
     if description.lower().startswith("deploy"):
         return str(HerokuRelease.ReleaseType.DEPLOYMENT)
     if description.lower().endswith("config vars"):
@@ -60,6 +62,14 @@ class HerokuReleaseQuerySet(models.QuerySet):
 class HerokuReleaseManager(models.Manager):
     def auto_create(self) -> HerokuRelease:
         """Create a new release from the current running dyno."""
+        if not HEROKU_RELEASE_VERSION:
+            raise Exception("Missing HEROKU_RELEASE_VERSION env var.")
+        if not HEROKU_RELEASE_CREATED_AT:
+            raise Exception("Missing HEROKU_RELEASE_CREATED_AT env var.")
+        if not HEROKU_SLUG_COMMIT:
+            raise Exception("Missing HEROKU_SLUG_COMMIT env var.")
+        if not HEROKU_SLUG_DESCRIPTION:
+            raise Exception("Missing HEROKU_SLUG_DESCRIPTION env var.")
         return self.create(
             version=HEROKU_RELEASE_VERSION,
             created_at=HEROKU_RELEASE_CREATED_AT,

@@ -20,20 +20,17 @@ GITHUB_API_RELEASES_URL = f"{GITHUB_API_REPO_URL}/releases"
 logger = logging.getLogger(__name__)
 
 
-def format_api_errors(ex: requests.HTTPError) -> str:
+def format_api_errors(ex: requests.HTTPError) -> str:  # noqa: C901 (11)
     """
     Format error messages.
 
-    See https://docs.github.com/en/rest/overview/resources-in-the-rest-api?apiVersion=2022-11-28#client-errors
+    See https://docs.github.com/en/rest/overview/resources-in-the-rest-api?apiVersion=2022-11-28#client-errors  # noqa: E501
 
     """
     response = ex.response
 
     def _400() -> str:
-        try:
-            return response.json()["message"]
-        except Exception:
-            logger.exception("Error parsing Github response")
+        return response.json()["message"]
 
     def _422() -> str:
         try:
@@ -44,9 +41,7 @@ def format_api_errors(ex: requests.HTTPError) -> str:
         except KeyError:
             logger.exception("Error parsing Github 422 response JSON:")
             logger.error(response.json())
-        except Exception:
-            logger.exception("Error parsing Github response")
-            logger.error(response.text)
+        return ""
 
     if response.status_code == 400:
         return _400()
@@ -73,7 +68,7 @@ def _request(
     request_method: str,
     url: str,
     raise_for_status: bool = True,
-    **request_kwargs,
+    **request_kwargs: object,
 ) -> requests.Response:
     auth = check_auth()
     headers = {"Accept": "application/vnd.github+json"}
@@ -95,6 +90,7 @@ def get_release(tag_name: str) -> dict:
     if response.status_code == 404:
         return {}
     response.raise_for_status()
+    return {}
 
 
 def update_release(release_id: int, data: dict) -> dict:

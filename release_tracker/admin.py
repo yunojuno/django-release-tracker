@@ -60,7 +60,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         if base_head := obj.base_head:
             url = f"https://github.com/{get_compare_url(base_head)}"
             return mark_safe(  # noqa: S308,S703
-                f"<a href='{url}' target='_blank' rel='noopener'>{base_head}</a>"
+                f"<a href='{url}' target='_blank' " "rel='noopener'>{base_head}</a>"
             )
         return ""
 
@@ -68,7 +68,8 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
     def release_url(self, obj: HerokuRelease) -> str:
         if obj.github_release_url:
             return mark_safe(  # noqa: S308,S703
-                f"<a href='{obj.github_release_url}' target='_blank' rel='noopener'>{str(obj)}</a>"
+                f"<a href='{obj.github_release_url}' "
+                "target='_blank' rel='noopener'>{str(obj)}</a>"
             )
         return ""
 
@@ -119,7 +120,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         for obj in qs:
             try:
                 obj.push()
-            except Exception:
+            except Exception:  # noqa: B902
                 failed += 1
             else:
                 pushed += 1

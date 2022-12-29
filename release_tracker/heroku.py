@@ -15,7 +15,7 @@ def check_auth() -> None:
         raise Exception("Missing HEROKU_API_TOKEN config var.")
 
 
-def _get(url: str, **headers: dict[str, str]) -> requests.Response:
+def _get(url: str, **headers: str) -> requests.Response:
     """Call the platform api with a GET request."""
     check_auth()
     headers.setdefault("Authorization", f"Bearer {HEROKU_API_TOKEN}")
