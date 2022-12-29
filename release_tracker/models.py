@@ -74,7 +74,7 @@ class HerokuReleaseManager(models.Manager):
             version=HEROKU_RELEASE_VERSION,
             created_at=HEROKU_RELEASE_CREATED_AT,
             commit=HEROKU_SLUG_COMMIT,
-            slug_description=HEROKU_SLUG_DESCRIPTION,
+            commit_description=HEROKU_SLUG_DESCRIPTION,
             release_type=get_release_type(HEROKU_SLUG_DESCRIPTION),
         )
 
