@@ -84,8 +84,8 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         self, request: HttpRequest, qs: HerokuReleaseQuerySet
     ) -> None:
         updated = failed = 0
-        ignored = qs.filter(commit="").count()
-        for obj in qs.exclude(commit=""):
+        ignored = qs.exclude(release_type=HerokuRelease.ReleaseType.DEPLOYMENT).count()
+        for obj in qs.deployments().order_by("id"):
             try:
                 obj.update_parent()
                 updated += 1
