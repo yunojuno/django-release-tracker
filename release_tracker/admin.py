@@ -60,7 +60,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         if base_head := obj.base_head:
             url = f"https://github.com/{get_compare_url(base_head)}"
             return mark_safe(  # noqa: S308,S703
-                f"<a href='{url}' target='_blank' " "rel='noopener'>{base_head}</a>"
+                f"<a href='{url}' target='_blank' rel='noopener'>{base_head}</a>"
             )
         return ""
 
@@ -69,7 +69,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         if obj.github_release_url:
             return mark_safe(  # noqa: S308,S703
                 f"<a href='{obj.github_release_url}' "
-                "target='_blank' rel='noopener'>{str(obj)}</a>"
+                f"target='_blank' rel='noopener'>{str(obj)}</a>"
             )
         return ""
 
