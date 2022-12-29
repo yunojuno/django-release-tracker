@@ -37,8 +37,26 @@ def crawl(max_count: int, range_start: str = "id ..", page_size: int = 1000) -> 
 
 
 def get_release(version: str) -> dict:
-    return _get(f"releases/{version}").json()
+    release = _get(f"releases/{version}").json()
+    return scrub_release(release)
 
 
 def get_slug(slug_id: UUID) -> dict:
-    return _get(f"slugs/{slug_id}").json()
+    slug = _get(f"slugs/{slug_id}").json()
+    return scrub_slug(slug)
+
+
+def scrub_release(release: dict) -> dict:
+    return {
+        k: v
+        for k, v in release.items()
+        if k in ["created_at", "description", "status", "id", "slug", "version"]
+    }
+
+
+def scrub_slug(slug: dict) -> dict:
+    return {
+        k: v
+        for k, v in slug.items()
+        if k in ["commit", "commit_description", "id", "size", "updated_at"]
+    }

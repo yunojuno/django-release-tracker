@@ -57,7 +57,7 @@ def format_api_errors(ex: requests.HTTPError) -> str:
     return ""
 
 
-def check_auth():
+def check_auth() -> tuple[str, str]:
     if not GITHUB_API_TOKEN:
         raise Exception("Missing GITHUB_API_TOKEN setting")
     if not GITHUB_ORG_NAME:
@@ -66,48 +66,58 @@ def check_auth():
         raise Exception("Missing GITHUB_USER_NAME setting")
     if not GITHUB_REPO_NAME:
         raise Exception("Missing GITHUB_REPO_NAME setting")
+    return (GITHUB_USER_NAME, GITHUB_API_TOKEN)
 
 
-def _request(method: str, **request_kwargs) -> requests.Response:
-    check_auth()
-    response = getattr(requests, method)(**request_kwargs)
-    response.raise_for_status()
+def _request(
+    request_method: str,
+    url: str,
+    raise_for_status: bool = True,
+    **request_kwargs,
+) -> requests.Response:
+    auth = check_auth()
+    headers = {"Accept": "application/vnd.github+json"}
+    method = getattr(requests, request_method)
+    response = method(url, auth=auth, headers=headers, **request_kwargs)
+    if raise_for_status:
+        response.raise_for_status()
     return response
-
-
-def _get(url: str) -> requests.Response:
-    return _request(
-        "get",
-        url=url,
-        headers={"Accept": "application/vnd.github+json"},
-        auth=(GITHUB_USER_NAME, GITHUB_API_TOKEN),
-    )
-
-
-def _post(url: str, data: list | dict) -> requests.Response:
-    return _request(
-        "post",
-        url=url,
-        headers={"Accept": "application/vnd.github+json"},
-        auth=(GITHUB_USER_NAME, GITHUB_API_TOKEN),
-        json=data,
-    )
 
 
 def get_release(tag_name: str) -> dict:
     """Fetch release JSON from API."""
     url = f"{GITHUB_API_RELEASES_URL}/tags/{tag_name}"
-    try:
-        return _get(url).json()
-    except requests.HTTPError as ex:
-        if ex.response.status_code == 404:
-            return {}
-        raise
+    response = _request("get", url, raise_for_status=False).json()
+    # release found - return the JSON representation
+    if response.status_code == 200:
+        return response.json()
+    # release does not exist - return a falsey empty dict
+    if response.status_code == 404:
+        return {}
+    response.raise_for_status()
+
+
+def update_release(release_id: int, data: dict) -> dict:
+    url = f"{GITHUB_API_RELEASES_URL}/{release_id}"
+    return _request("patch", url, json=data).json()
+
+
+def delete_release(release_id: int) -> None:
+    url = f"{GITHUB_API_RELEASES_URL}/{release_id}"
+    response = _request("delete", url, raise_for_status=False)
+    # expected response status for a deletion
+    if response.status_code == 204:
+        return
+    # release does not exist - ignore
+    if response.status_code == 404:
+        return
+    # for everything else raise if appropriate
+    response.raise_for_status()
 
 
 def create_release(
     tag_name: str,
-    commit_hash: str,
+    commit: str,
     body: str | None = None,
     generate_release_notes: bool = True,
 ) -> dict:
@@ -115,11 +125,11 @@ def create_release(
     data = {
         "tag_name": tag_name,
         "name": f"Release {tag_name}",
-        "target_commitish": commit_hash,
+        "target_commitish": commit,
         "body": body,
         "generate_release_notes": generate_release_notes,
     }
-    return _post(GITHUB_API_RELEASES_URL, data).json()
+    return _request("post", GITHUB_API_RELEASES_URL, json=data).json()
 
 
 def get_compare_url(base_head: str) -> str:

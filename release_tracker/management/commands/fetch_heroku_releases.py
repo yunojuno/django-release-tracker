@@ -21,9 +21,11 @@ class Command(BaseCommand):
         new_releases = [
             r for r in all_releases if r["version"] not in existing_releases
         ]
-        HerokuRelease.objects.all().values_list("version", flat=True)
         for release in new_releases:
             try:
-                HerokuRelease.objects.create_from_api(**release)
+                self.stdout.write("Creating new release")
+                hr = HerokuRelease(version=release["version"])
+                hr.parse_heroku_api_response(release)
+                hr.save()
             except IntegrityError:
                 self.stderr.write(f"Error creating new release:\n{release}")

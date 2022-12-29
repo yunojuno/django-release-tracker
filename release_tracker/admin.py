@@ -21,26 +21,22 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "version",
         "created_at",
         "description",
-        # "commit_hash",
         "diff_url",
         "release_url",
-        # "has_release_note",
     )
     list_filter = ("created_at", "release_type")
     exclude = ("heroku_release", "github_release", "slug_id")
     ordering = ("-version",)
     readonly_fields = (
         "version",
-        "commit_hash",
         "release_type",
         "description",
-        "release_note",
+        "commit",
+        "commit_description",
         "created_at",
         "pulled_at",
-        # "heroku_release_id",
         "pushed_at",
         "parent",
-        # "github_release_id",
         "release_url",
         "diff_url",
         "status",
@@ -53,10 +49,6 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "push_to_github",
         "sync_releases",
     )
-
-    @admin.display(description="Release note", boolean=True)
-    def has_release_note(self, obj: HerokuRelease) -> bool:
-        return bool(obj.release_note)
 
     @admin.display(description="Changeset")
     def _diff(self, obj: HerokuRelease) -> str:
@@ -92,8 +84,8 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         self, request: HttpRequest, qs: HerokuReleaseQuerySet
     ) -> None:
         updated = failed = 0
-        ignored = qs.filter(commit_hash="").count()
-        for obj in qs.exclude(commit_hash=""):
+        ignored = qs.filter(commit="").count()
+        for obj in qs.exclude(commit=""):
             try:
                 obj.update_parent()
                 updated += 1
@@ -151,35 +143,3 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
             f"Synced {qs.count()} releases between Heroku and Github.",
             "success",
         )
-
-    # @admin.action(description="Update selected release notes")
-    # def set_release_notes(
-    #     self, request: HttpRequest, qs: HerokuReleaseQuerySet
-    # ) -> None:
-    #     updated = ignored = failed = 0
-    #     for obj in qs:
-    #         if not obj.base_head:
-    #             ignored += 1
-    #             continue
-    #         try:
-    #             obj.update_release_note()
-    #             updated += 1
-    #         except Exception:  # noqa: B902
-    #             failed += 1
-    #     if updated:
-    #         self.message_user(
-    #             request, f"Updated {updated}  Heroku releases.", "success"
-    #         )
-    #     if ignored:
-    #         self.message_user(
-    #             request, f"Ignored {ignored} non-deployment releases", "warning"
-    #         )
-    #     if failed:
-    #         self.message_user(
-    #             request, f"Failed to update {failed}  Heroku releases.", "error"
-    #         )
-
-    # @admin.action(description="Generate Github release")
-    # def push_to_github(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
-    #     for obj in qs.order_by("id"):
-    #         obj.push()
