@@ -27,5 +27,6 @@ class Command(BaseCommand):
                 hr = HerokuRelease(version=release["version"])
                 hr.parse_heroku_api_response(release)
                 hr.save()
+                hr.update_parent()
             except IntegrityError:
                 self.stderr.write(f"Error creating new release:\n{release}")

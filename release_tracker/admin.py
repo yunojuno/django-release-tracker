@@ -21,6 +21,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "version",
         "created_at",
         "description",
+        "parent",
         "diff_url",
         "release_url",
     )
@@ -133,6 +134,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
 
     @admin.action(description="Sync selected releases (Heroku to Gihub)")
     def sync_releases(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
+        qs = qs.deployments()
         for obj in qs:
             try:
                 obj.sync()

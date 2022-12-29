@@ -264,7 +264,7 @@ class HerokuRelease(models.Model):
         return {
             "tag_name": self.tag_name,
             "commit": self.commit,
-            "body": self.release_note,
+            "body": self.commit_description,
             "generate_release_notes": True,
         }
 

@@ -87,7 +87,7 @@ def _request(
 def get_release(tag_name: str) -> dict:
     """Fetch release JSON from API."""
     url = f"{GITHUB_API_RELEASES_URL}/tags/{tag_name}"
-    response = _request("get", url, raise_for_status=False).json()
+    response = _request("get", url, raise_for_status=False)
     # release found - return the JSON representation
     if response.status_code == 200:
         return response.json()
