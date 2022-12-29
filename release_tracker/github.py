@@ -68,16 +68,41 @@ def check_auth():
         raise Exception("Missing GITHUB_REPO_NAME setting")
 
 
-def _post(url: str, data: list | dict) -> requests.Response:
+def _request(method: str, **request_kwargs) -> requests.Response:
     check_auth()
-    response = requests.post(
-        url,
+    response = getattr(requests, method)(**request_kwargs)
+    response.raise_for_status()
+    return response
+
+
+def _get(url: str) -> requests.Response:
+    return _request(
+        "get",
+        url=url,
+        headers={"Accept": "application/vnd.github+json"},
+        auth=(GITHUB_USER_NAME, GITHUB_API_TOKEN),
+    )
+
+
+def _post(url: str, data: list | dict) -> requests.Response:
+    return _request(
+        "post",
+        url=url,
         headers={"Accept": "application/vnd.github+json"},
         auth=(GITHUB_USER_NAME, GITHUB_API_TOKEN),
         json=data,
     )
-    response.raise_for_status()
-    return response
+
+
+def get_release(tag_name: str) -> dict:
+    """Fetch release JSON from API."""
+    url = f"{GITHUB_API_RELEASES_URL}/tags/{tag_name}"
+    try:
+        return _get(url).json()
+    except requests.HTTPError as ex:
+        if ex.response.status_code == 404:
+            return {}
+        raise
 
 
 def create_release(
@@ -86,6 +111,7 @@ def create_release(
     body: str | None = None,
     generate_release_notes: bool = True,
 ) -> dict:
+    """Create a new Github release."""
     data = {
         "tag_name": tag_name,
         "name": f"Release {tag_name}",
