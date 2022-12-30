@@ -332,13 +332,16 @@ class HerokuRelease(models.Model):
             raise AttributeError(f"{self} is missing tag_name property.")
         if not self.commit:
             raise AttributeError(f"{self} is missing commit property.")
+        # if the parent has not been pushed then autogenerating the
+        # release note will pull in every commit in history...
+        generate_release_notes = bool(self.parent and self.parent.pushed_at)
         self.github_release = github.get_release(
             self.tag_name
         ) or github.create_release(
             tag_name=self.tag_name,
             commit=self.commit,
             body=self.commit_description,
-            generate_release_notes=True,
+            generate_release_notes=generate_release_notes,
         )
         self.pushed_at = tz_now()
         self.save()
