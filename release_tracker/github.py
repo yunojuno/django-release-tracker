@@ -85,7 +85,7 @@ def get_release(tag_name: str) -> dict:
     response = _request("get", url, raise_for_status=False)
     # release found - return the JSON representation
     if response.status_code == 200:
-        return response.json()
+        return scrub_release(response.json())
     # release does not exist - return a falsey empty dict
     if response.status_code == 404:
         return {}
@@ -95,7 +95,8 @@ def get_release(tag_name: str) -> dict:
 
 def update_release(release_id: int, data: dict) -> dict:
     url = f"{GITHUB_API_RELEASES_URL}/{release_id}"
-    return _request("patch", url, json=data).json()
+    release = _request("patch", url, json=data).json()
+    return scrub_release(release)
 
 
 def delete_release(release_id: int) -> None:
@@ -125,8 +126,27 @@ def create_release(
         "body": body,
         "generate_release_notes": generate_release_notes,
     }
-    return _request("post", GITHUB_API_RELEASES_URL, json=data).json()
+    release = _request("post", GITHUB_API_RELEASES_URL, json=data).json()
+    return scrub_release(release)
 
 
 def get_compare_url(base_head: str) -> str:
     return f"{GITHUB_ORG_NAME}/{GITHUB_REPO_NAME}/compare/{base_head}"
+
+
+def scrub_release(slug: dict) -> dict:
+    return {
+        k: v
+        for k, v in slug.items()
+        if k
+        in [
+            "body",
+            "created_at",
+            "html_url",
+            "id",
+            "name",
+            "published_at",
+            "tag_name",
+            "target_commitish",
+        ]
+    }

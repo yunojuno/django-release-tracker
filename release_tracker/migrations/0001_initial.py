@@ -45,7 +45,7 @@ class Migration(migrations.Migration):
                     models.CharField(
                         blank=True,
                         default="",
-                        help_text="Commit hash - can be short or long.",
+                        help_text="Commit hash - pulled from Heroku API (/slugs), pushed to Github.",
                         max_length=40,
                     ),
                 ),
@@ -128,6 +128,7 @@ class Migration(migrations.Migration):
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
                         to="release_tracker.herokurelease",
+                        related_name="child",
                     ),
                 ),
             ],

@@ -142,7 +142,7 @@ class HerokuRelease(models.Model):
         max_length=40,
         blank=True,
         default="",
-        help_text="Commit hash - can be short or long.",
+        help_text="Commit hash - pulled from Heroku API (/slugs), pushed to Github.",
     )
 
     commit_description = models.TextField(
@@ -194,6 +194,7 @@ class HerokuRelease(models.Model):
         null=True,
         on_delete=models.SET_NULL,
         help_text="The previous release - used to generate changelog.",
+        related_name="child",
     )
 
     release_type = models.CharField(
@@ -216,18 +217,18 @@ class HerokuRelease(models.Model):
         return self.release_type == HerokuRelease.ReleaseType.DEPLOYMENT
 
     @property
-    def has_long_commit(self) -> bool:
-        return len(self.commit) == 40
-
-    @property
     def short_commit(self) -> str:
-        return self.commit[:6]
+        return self.commit[:6] if self.commit else get_commit(self.description)
 
     @property
     def tag_name(self) -> str:
         if self.is_deployment:
             return f"v{self.version}"
         return ""
+
+    @property
+    def is_synced(self) -> bool | None:
+        return self.pulled_at and self.pushed_at
 
     @property
     def base_head(self) -> str:
@@ -268,18 +269,9 @@ class HerokuRelease(models.Model):
             return None
         return self.github_release["html_url"]
 
-    @property
-    def github_release_data(self) -> dict:
-        """Format the data required for the release API call."""
-        return {
-            "tag_name": self.tag_name,
-            "commit": self.commit,
-            "body": self.commit_description,
-            "generate_release_notes": True,
-        }
-
     def parse_heroku_api_response(self, data: dict) -> None:
         """Parse API release data into properties."""
+        logger.debug("Parsing Heroku API response")
         self.status = data["status"]
         self.description = data["description"]
         self.release_type = get_release_type(self.description)
@@ -299,13 +291,10 @@ class HerokuRelease(models.Model):
         updates the commit and release note from the Slug. It updates
         the heroku_release attribute with the full Slug data.
 
-        Fields that are updated by this method:
-
-            "heroku_release", "slug_id", "commit", "release_note"
-
         """
         if not self.version:
             raise AttributeError("Missing version number.")
+        logger.debug("Pulling release %s from Heroku", self.version)
         release = heroku.get_release(self.version)
         if release.get("slug", None):
             slug = heroku.get_slug(release["slug"]["id"])
@@ -314,14 +303,13 @@ class HerokuRelease(models.Model):
         self.pulled_at = tz_now()
         self.save()
 
-    def push(self) -> bool:
+    def push(self) -> None:
         """
         Push release data to Github.
 
-        This is a pessimistic upsert - makes two API calls, the first is
-        a GET to fetch a matching release. If it exists, a second PATCH
-        request is made to update it. If not, a POST request is made to
-        create a new release.
+        This is a pessimistic insert - makes two API calls, the first is
+        a GET to fetch a matching release. If it does not exist, a
+        second POST request is made to create a new release.
 
         Raises AttributeError if the tag_name is not set as without this
         it's impossible to create a release.
@@ -329,14 +317,18 @@ class HerokuRelease(models.Model):
         """
         if not self.tag_name:
             raise AttributeError(f"{self} is missing tag_name property.")
-        if release := github.get_release(self.tag_name):
-            _ = github.update_release(release["id"], self.github_release_data)
-        else:
-            release = github.create_release(**self.github_release_data)
-        self.github_release = release
+        if not self.commit:
+            raise AttributeError(f"{self} is missing commit property.")
+        self.github_release = github.get_release(
+            self.tag_name
+        ) or github.create_release(
+            tag_name=self.tag_name,
+            commit=self.commit,
+            body=self.commit_description,
+            generate_release_notes=True,
+        )
         self.pushed_at = tz_now()
         self.save()
-        return True
 
     def sync(self) -> None:
         """
@@ -345,7 +337,14 @@ class HerokuRelease(models.Model):
         The minimum requirement here is a version number.
 
         """
-        if not self.version:
-            raise AttributeError("Missing version number.")
         self.pull()
         self.push()
+
+    def delete_from_github(self) -> None:
+        """Delete Github release and reset metadata to reflect this."""
+        if not self.github_release_id:
+            return
+        github.delete_release(self.github_release_id)
+        self.github_release = None
+        self.pushed_at = None
+        self.save()

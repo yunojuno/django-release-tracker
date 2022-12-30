@@ -21,7 +21,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "version",
         "created_at",
         "description",
-        "parent",
+        "synced_",
         "diff_url",
         "release_url",
     )
@@ -35,27 +35,29 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "commit",
         "commit_description",
         "created_at",
+        "parent",
         "pulled_at",
         "pushed_at",
-        "parent",
+        "synced_",
         "release_url",
         "diff_url",
         "status",
-        "_heroku",
-        "_github",
+        "heroku_",
+        "github_",
     )
     actions = (
         "set_parent_releases",
         "pull_from_heroku",
         "push_to_github",
         "sync_releases",
+        "delete_releases",
     )
 
     @admin.display(description="Changeset")
     def _diff(self, obj: HerokuRelease) -> str:
         return obj.base_head
 
-    @admin.display(description="Github diff")
+    @admin.display(description="Changeset")
     def diff_url(self, obj: HerokuRelease) -> str:
         if base_head := obj.base_head:
             url = f"https://github.com/{get_compare_url(base_head)}"
@@ -73,12 +75,18 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
             )
         return ""
 
+    @admin.display(description="Synced", boolean=True)
+    def synced_(self, obj: HerokuRelease) -> bool | None:
+        if not obj.is_deployment:
+            return None
+        return bool(obj.is_synced)
+
     @admin.display(description="Heroku API release data")
-    def _heroku(self, obj: HerokuRelease) -> str:
+    def heroku_(self, obj: HerokuRelease) -> str:
         return format_json(obj.heroku_release)
 
     @admin.display(description="Github API release data")
-    def _github(self, obj: HerokuRelease) -> str:
+    def github_(self, obj: HerokuRelease) -> str:
         return format_json(obj.github_release)
 
     @admin.action(description="Update selected release parents")
@@ -146,3 +154,17 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
             f"Synced {qs.count()} releases between Heroku and Github.",
             "success",
         )
+
+    @admin.action(description="Delete selected releases from Github")
+    def delete_releases(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
+        qs = qs.deployments()
+        deleted = 0
+        for obj in qs:
+            obj.delete_from_github()
+            deleted += 1
+        if deleted:
+            self.message_user(
+                request,
+                f"Deleted {deleted} releases from Github.",
+                "success",
+            )
