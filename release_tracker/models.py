@@ -25,6 +25,10 @@ def get_release_type(description: str) -> str:
         raise ValueError("Missing description.")
     if description.lower().startswith("deploy"):
         return str(HerokuRelease.ReleaseType.DEPLOYMENT)
+    if description.lower().startswith("promote"):
+        return str(HerokuRelease.ReleaseType.PROMOTION)
+    if description.lower().startswith("rollback"):
+        return str(HerokuRelease.ReleaseType.ROLLBACK)
     if description.lower().endswith("config vars"):
         return str(HerokuRelease.ReleaseType.ENV_VARS)
     if description.lower().startswith("update"):
@@ -56,7 +60,10 @@ def get_release_parent(version: int) -> HerokuRelease | None:
 
 class HerokuReleaseQuerySet(models.QuerySet):
     def deployments(self) -> HerokuReleaseQuerySet:
-        return self.filter(release_type=HerokuRelease.ReleaseType.DEPLOYMENT)
+        return self.filter(release_type__in=[
+            HerokuRelease.ReleaseType.DEPLOYMENT,
+            HerokuRelease.ReleaseType.PROMOTION,
+        ])
 
 
 class HerokuReleaseManager(models.Manager):
@@ -119,7 +126,9 @@ class HerokuReleaseManager(models.Manager):
 class HerokuRelease(models.Model):
     class ReleaseType(models.TextChoices):
 
-        DEPLOYMENT = ("DEPLOYMENT", "Code deployment")
+        DEPLOYMENT = ("DEPLOYMENT", "Slug deployment")
+        PROMOTION = ("PROMOTION", "Pipeline promotion")
+        ROLLBACK = ("ROLLBACK", "Release rollback")
         ADD_ON = ("ADD_ON", "Add-ons")
         ENV_VARS = ("ENV_VARS", "Config vars")
         OTHER = ("OTHER", "Other (misc.)")
@@ -217,12 +226,16 @@ class HerokuRelease(models.Model):
         return self.release_type == HerokuRelease.ReleaseType.DEPLOYMENT
 
     @property
+    def is_promotion(self) -> bool:
+        return self.release_type == HerokuRelease.ReleaseType.PROMOTION
+
+    @property
     def short_commit(self) -> str:
         return self.commit[:6] if self.commit else get_commit(self.description)
 
     @property
     def tag_name(self) -> str:
-        if self.is_deployment:
+        if self.is_deployment or self.is_promotion:
             return f"v{self.version}"
         return ""
 
@@ -243,9 +256,9 @@ class HerokuRelease(models.Model):
 
     def get_parent(self) -> HerokuRelease | None:
         """Return first deployment before this one."""
-        if not self.is_deployment:
-            return None
-        return get_release_parent(self.version)
+        if self.is_deployment or self.is_promotion:
+            return get_release_parent(self.version)
+        return None
 
     def update_parent(self) -> None:
         self.parent = self.get_parent()

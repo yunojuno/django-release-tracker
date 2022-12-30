@@ -14,7 +14,7 @@ class Command(BaseCommand):
 
     def handle(self, *args: Any, **options: Any) -> None:
 
-        all_releases = crawl(max_count=100)
+        all_releases = crawl(max_count=10000)
         existing_releases = HerokuRelease.objects.all().values_list(
             "version", flat=True
         )
@@ -23,10 +23,12 @@ class Command(BaseCommand):
         ]
         for release in new_releases:
             try:
-                self.stdout.write("Creating new release")
-                hr = HerokuRelease(version=release["version"])
+                version = release["version"]
+                self.stdout.write(f"Creating new release: {version}")
+                hr = HerokuRelease(version=version)
                 hr.parse_heroku_api_response(release)
                 hr.save()
                 hr.update_parent()
-            except IntegrityError:
-                self.stderr.write(f"Error creating new release:\n{release}")
+            except IntegrityError as ex:
+                self.stderr.write(f"Error creating new release: {ex}")
+                self.stderr.write(release)

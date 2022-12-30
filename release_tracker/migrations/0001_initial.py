@@ -111,7 +111,9 @@ class Migration(migrations.Migration):
                     models.CharField(
                         blank=True,
                         choices=[
-                            ("DEPLOYMENT", "Code deployment"),
+                            ("DEPLOYMENT", "Slug deployment"),
+                            ("PROMOTION", "Pipeline promotion"),
+                            ("ROLLBACK", "Release rollback"),
                             ("ADD_ON", "Add-ons"),
                             ("ENV_VARS", "Config vars"),
                             ("OTHER", "Other (misc.)"),

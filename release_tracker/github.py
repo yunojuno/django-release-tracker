@@ -74,6 +74,8 @@ def _request(
     headers = {"Accept": "application/vnd.github+json"}
     method = getattr(requests, request_method)
     response = method(url, auth=auth, headers=headers, **request_kwargs)
+    if response.status_code == 422:
+        logger.debug(response.json())
     if raise_for_status:
         response.raise_for_status()
     return response
