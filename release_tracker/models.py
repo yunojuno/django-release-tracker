@@ -6,6 +6,7 @@ from uuid import UUID
 
 import dateparser
 from django.db import models
+from django.template import loader
 from django.utils.timezone import now as tz_now
 
 from . import github, heroku
@@ -60,10 +61,12 @@ def get_release_parent(version: int) -> HerokuRelease | None:
 
 class HerokuReleaseQuerySet(models.QuerySet):
     def deployments(self) -> HerokuReleaseQuerySet:
-        return self.filter(release_type__in=[
-            HerokuRelease.ReleaseType.DEPLOYMENT,
-            HerokuRelease.ReleaseType.PROMOTION,
-        ])
+        return self.filter(
+            release_type__in=[
+                HerokuRelease.ReleaseType.DEPLOYMENT,
+                HerokuRelease.ReleaseType.PROMOTION,
+            ]
+        )
 
 
 class HerokuReleaseManager(models.Manager):
@@ -223,11 +226,11 @@ class HerokuRelease(models.Model):
 
     @property
     def is_deployment(self) -> bool:
-        return self.release_type == HerokuRelease.ReleaseType.DEPLOYMENT
-
-    @property
-    def is_promotion(self) -> bool:
-        return self.release_type == HerokuRelease.ReleaseType.PROMOTION
+        """Return True if this represents a new code deployment."""
+        return self.release_type in [
+            HerokuRelease.ReleaseType.DEPLOYMENT,
+            HerokuRelease.ReleaseType.PROMOTION,
+        ]
 
     @property
     def short_commit(self) -> str:
@@ -282,17 +285,21 @@ class HerokuRelease(models.Model):
             return None
         return self.github_release["html_url"]
 
+    def github_release_body(self) -> str:
+        """Render the copy used as the 'body' arg to create new release."""
+        return loader.render_to_string("release_tracker/release.md", {"release": self})
+
     def parse_heroku_api_response(self, data: dict) -> None:
         """Parse API release data into properties."""
         logger.debug("Parsing Heroku API response")
-        self.status = data["status"]
-        self.description = data["description"]
+        self.status = data["status"] or ""
+        self.description = data["description"] or ""
         self.release_type = get_release_type(self.description)
         self.created_at = dateparser.parse(data["created_at"])
         if slug := data["slug"]:
             self.slug_id = slug.get("id", None)
-            self.commit = slug.get("commit", "")
-            self.commit_description = slug.get("commit_description", "")
+            self.commit = slug.get("commit") or ""
+            self.commit_description = slug.get("commit_description") or ""
         self.heroku_release = data
 
     def pull(self) -> None:
@@ -340,7 +347,7 @@ class HerokuRelease(models.Model):
         ) or github.create_release(
             tag_name=self.tag_name,
             commit=self.commit,
-            body=self.commit_description,
+            body=self.github_release_body(),
             generate_release_notes=generate_release_notes,
         )
         self.pushed_at = tz_now()
@@ -362,5 +369,7 @@ class HerokuRelease(models.Model):
             return
         github.delete_release(self.github_release_id)
         self.github_release = None
+        self.pushed_at = None
+        self.save()
         self.pushed_at = None
         self.save()
