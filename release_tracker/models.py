@@ -239,7 +239,7 @@ class HerokuRelease(models.Model):
 
     @property
     def tag_name(self) -> str:
-        if self.is_deployment or self.is_promotion:
+        if self.is_deployment:
             return f"v{self.version}"
         return ""
 
@@ -260,7 +260,7 @@ class HerokuRelease(models.Model):
 
     def get_parent(self) -> HerokuRelease | None:
         """Return first deployment before this one."""
-        if self.is_deployment or self.is_promotion:
+        if self.is_deployment:
             return get_release_parent(self.version)
         return None
 

@@ -77,7 +77,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
 
     @admin.display(description="Synced", boolean=True)
     def synced_(self, obj: HerokuRelease) -> bool | None:
-        if obj.is_deployment or obj.is_promotion:
+        if obj.is_deployment:
             return bool(obj.is_synced)
         return None
 
