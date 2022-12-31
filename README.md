@@ -4,7 +4,7 @@ Django app for syncing Heroku and Github releases.
 
 ## Version support
 
-This app support Django 2.2+ and Python 3.7+.
+This app support Django 3.2+ and Python 3.10+.
 
 ## Background
 

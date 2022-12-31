@@ -1,14 +1,14 @@
 [tool.poetry]
-name = "django-heroku-release-tracker"
+name = "django-release-tracker"
 version = "0.1.0"
 description = "Django app for syncing Heroku and Github releases."
 license = "MIT"
 authors = ["YunoJuno <code@yunojuno.com>"]
 maintainers = ["YunoJuno <code@yunojuno.com>"]
 readme = "README.md"
-homepage = "https://github.com/yunojuno/django-heroku-github-sync"
-repository = "https://github.com/yunojuno/django-heroku-github-sync"
-documentation = "https://github.com/yunojuno/django-heroku-github-sync"
+homepage = "https://github.com/yunojuno/django-release-tracker"
+repository = "https://github.com/yunojuno/django-release-tracker"
+documentation = "https://github.com/yunojuno/django-release-tracker"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Web Environment",
