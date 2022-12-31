@@ -11,6 +11,7 @@ from django.utils.timezone import now as tz_now
 
 from . import github, heroku
 from .settings import (
+    GITHUB_SYNC_ENABLED,
     HEROKU_RELEASE_CREATED_AT,
     HEROKU_RELEASE_VERSION,
     HEROKU_SLUG_COMMIT,
@@ -335,6 +336,8 @@ class HerokuRelease(models.Model):
         it's impossible to create a release.
 
         """
+        if not GITHUB_SYNC_ENABLED:
+            raise Exception("GITHUB_SYNC_ENABLED is False")
         if not self.tag_name:
             raise AttributeError(f"{self} is missing tag_name property.")
         if not self.commit:

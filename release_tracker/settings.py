@@ -38,3 +38,10 @@ GITHUB_ORG_NAME = getenv("GITHUB_ORG_NAME")
 
 # The source repo
 GITHUB_REPO_NAME = getenv("GITHUB_REPO_NAME")
+
+# Disable GH sync if you are deploying to multiple Heroku apps and you
+# don't want a tag clash.
+GITHUB_SYNC_ENABLED = getenv(
+    "GITHUB_SYNC_ENABLED",
+    all([GITHUB_API_TOKEN, GITHUB_USER_NAME, GITHUB_ORG_NAME, GITHUB_REPO_NAME]),
+)
