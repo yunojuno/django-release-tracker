@@ -21,6 +21,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "version",
         "created_at",
         "description",
+        "slug_size_display",
         "synced_",
         "diff_url",
         "release_url",
@@ -34,6 +35,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "description",
         "commit",
         "commit_description",
+        "slug_size_display",
         "created_at",
         "parent",
         "pulled_at",
@@ -52,6 +54,10 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "sync_releases",
         "delete_releases",
     )
+
+    @admin.display(description="Slug size (MB)")
+    def slug_size_display(self, obj: HerokuRelease) -> str:
+        return obj.slug_size_display
 
     @admin.display(description="Changeset")
     def _diff(self, obj: HerokuRelease) -> str:

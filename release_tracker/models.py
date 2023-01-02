@@ -260,6 +260,19 @@ class HerokuRelease(models.Model):
             return ""
         return f"{self.parent.short_commit}...{self.short_commit}"
 
+    @property
+    def slug_size(self) -> int | None:
+        if self.pulled_at and self.heroku_release:
+            return self.heroku_release["slug"]["size"]
+        return None
+
+    @property
+    def slug_size_display(self) -> str:
+        """Return str representation of slug size as MB."""
+        if not self.slug_size:
+            return ""
+        return f"{int(self.slug_size / 1024 / 1024)}MB"
+
     def get_parent(self) -> HerokuRelease | None:
         """Return first deployment before this one."""
         if self.is_deployment:
