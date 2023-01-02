@@ -237,7 +237,7 @@ class HerokuRelease(models.Model):
 
     @property
     def short_commit(self) -> str:
-        return self.commit[:6] if self.commit else get_commit(self.description)
+        return self.commit[:8] if self.commit else get_commit(self.description)
 
     @property
     def tag_name(self) -> str:
