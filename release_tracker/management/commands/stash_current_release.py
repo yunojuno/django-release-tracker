@@ -18,20 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
+
     def handle(self, *args: Any, **options: Any) -> None:
         try:
-            self.stdout.write("Creating new HerokuRelease object")
-            release: HerokuRelease = HerokuRelease.objects.auto_create()
-            self.stdout.write(f"Syncing {release} with Github")
-            release.sync()
-            self.stdout.write("Updating release parent")
-            release.update_parent()
+            logger.info("Creating new HerokuRelease object")
+            release: HerokuRelease = HerokuRelease.objects.auto_create().sync()
         except IntegrityError as ex:
-            self.stderr.write(f"Error stashing current release: {ex}")
+            logger.exception("Database error stashing current release.")
         except requests.HTTPError as ex:
-            self.stderr.write(f"Error pushing current release to github: {ex}")
+            logger.exception("HTTP error syncing current release.")
         except Exception as ex:  # noqa: B902
-            logger.exception("Error ")
-            self.stderr.write(f"Error pushing current release to github: {ex}")
+            logger.exception("Unknown error syncing current release.")
         else:
-            self.stdout.write(f"Created new release: {release}")
+            logger.info("Created new release: %s", release)

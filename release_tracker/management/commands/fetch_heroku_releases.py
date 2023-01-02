@@ -22,11 +22,11 @@ class Command(BaseCommand):
             r for r in all_releases if r["version"] not in existing_releases
         ]
         for release in new_releases:
+            version = release["version"]
+            self.stdout.write(f"Creating new release: {version}")
+            hr = HerokuRelease(version=version)
+            hr.parse_heroku_api_response(release)
             try:
-                version = release["version"]
-                self.stdout.write(f"Creating new release: {version}")
-                hr = HerokuRelease(version=version)
-                hr.parse_heroku_api_response(release)
                 hr.save()
                 hr.update_parent()
             except IntegrityError as ex:

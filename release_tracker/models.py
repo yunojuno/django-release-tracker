@@ -81,13 +81,15 @@ class HerokuReleaseManager(models.Manager):
             raise Exception("Missing HEROKU_SLUG_COMMIT env var.")
         if not HEROKU_SLUG_DESCRIPTION:
             raise Exception("Missing HEROKU_SLUG_DESCRIPTION env var.")
-        return self.create(
+        release = self.create(
             version=HEROKU_RELEASE_VERSION,
             created_at=HEROKU_RELEASE_CREATED_AT,
             commit=HEROKU_SLUG_COMMIT,
             commit_description=HEROKU_SLUG_DESCRIPTION,
             release_type=get_release_type(HEROKU_SLUG_DESCRIPTION),
         )
+        release.update_parent()
+        return release
 
     def create_from_api(
         self,
@@ -301,7 +303,7 @@ class HerokuRelease(models.Model):
             self.slug_id = slug.get("id", None)
             self.commit = slug.get("commit") or ""
             self.commit_description = slug.get("commit_description") or ""
-        self.heroku_release = data
+        self.heroku_release = heroku.scrub_release(data)
 
     def pull(self) -> None:
         """
