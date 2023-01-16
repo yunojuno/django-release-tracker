@@ -178,7 +178,9 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
             )
 
     @admin.action(description="Update Github release notes")
-    def update_release_notes(self, request: HttpRequest, qs: QuerySet[HerokuRelease]) -> None:
+    def update_release_notes(
+        self, request: HttpRequest, qs: QuerySet[HerokuRelease]
+    ) -> None:
         qs = qs.deployments()
         updated = 0
         for obj in qs:

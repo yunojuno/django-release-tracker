@@ -30,7 +30,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
 
-PROJECT_DIR = path.abspath(path.join(path.dirname(__file__), '..'))
+PROJECT_DIR = path.abspath(path.join(path.dirname(__file__), ".."))
 
 TEMPLATES = [
     {

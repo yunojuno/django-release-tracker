@@ -6,7 +6,6 @@ from uuid import UUID
 
 import dateparser
 from django.db import models
-from django.template import loader
 from django.utils.timezone import now as tz_now
 
 from . import github, heroku
@@ -21,7 +20,7 @@ from .settings import (
 logger = logging.getLogger(__name__)
 
 
-def get_release_type(description: str) -> str:
+def get_release_type(description: str) -> str:  # noqa: C901
     """Extract release type from description."""
     if not description:
         raise ValueError("Missing description.")
@@ -305,12 +304,6 @@ class HerokuRelease(models.Model):
             return None
         return self.github_release["html_url"]
 
-    def github_release_body(self, **template_kwargs: object) -> str:
-        """Render the copy used as the 'body' arg to create new release."""
-        context = {"release": self}
-        context.update(template_kwargs)
-        return loader.render_to_string("release_tracker/release.md", context=context)
-
     def parse_heroku_api_response(self, data: dict) -> None:
         """Parse API release data into properties."""
         logger.debug("Parsing Heroku API response")
@@ -371,19 +364,13 @@ class HerokuRelease(models.Model):
         ) or github.create_release(
             tag_name=self.tag_name,
             commit=self.commit,
-            body=self.github_release_body(),
             generate_release_notes=generate_release_notes,
         )
         self.pushed_at = tz_now()
         self.save()
 
     def sync(self) -> None:
-        """
-        Pull from Heroku and push to Github.
-
-        The minimum requirement here is a version number.
-
-        """
+        """Pull from Heroku and push to Github."""
         self.pull()
         self.push()
 
@@ -396,11 +383,11 @@ class HerokuRelease(models.Model):
         self.pushed_at = None
         self.save()
 
-    def update_release_notes(self) -> None:
-        if not self.pushed_at:
+    def update_generated_release_notes(self) -> None:
+        """Update the automated release notes."""
+        if not (self.pushed_at and self.github_release_id):
             raise ValueError("Release has not yet been pushed to Github.")
-        generated_notes = github.generate_release_notes(self.tag_name)
-        print("generated notes", generated_notes)
-        release_note = self.github_release_body(generated_notes=generated_notes)
-        print("release note", release_note)
-        github.update_release(self.github_release_id, {"body": release_note})
+        github.update_release(
+            self.github_release_id,
+            {"body": github.generate_release_notes(self.tag_name)},
+        )
