@@ -2,6 +2,7 @@ import json
 
 import requests
 from django.contrib import admin
+from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.utils.safestring import mark_safe
 
@@ -53,6 +54,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "push_to_github",
         "sync_releases",
         "delete_releases",
+        "update_release_notes",
     )
 
     @admin.display(description="Slug size (MB)")
@@ -147,7 +149,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
                 request, f"Failed to push {failed} releases to Github.", "error"
             )
 
-    @admin.action(description="Sync selected releases (Heroku to Gihub)")
+    @admin.action(description="Sync selected releases (Heroku to Github)")
     def sync_releases(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
         qs = qs.deployments()
         for obj in qs:
@@ -172,5 +174,19 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
             self.message_user(
                 request,
                 f"Deleted {deleted} releases from Github.",
+                "success",
+            )
+
+    @admin.action(description="Update Github release notes")
+    def update_release_notes(self, request: HttpRequest, qs: QuerySet[HerokuRelease]) -> None:
+        qs = qs.deployments()
+        updated = 0
+        for obj in qs:
+            obj.update_release_notes()
+            updated += 1
+        if updated:
+            self.message_user(
+                request,
+                f"Updated {updated} releases.",
                 "success",
             )

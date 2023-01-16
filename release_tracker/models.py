@@ -262,8 +262,12 @@ class HerokuRelease(models.Model):
 
     @property
     def slug_size(self) -> int | None:
-        if self.pulled_at and self.heroku_release:
-            return self.heroku_release["slug"]["size"]
+        if not self.pulled_at:
+            return None
+        if not self.heroku_release:
+            return None
+        if slug := self.heroku_release["slug"]:
+            return slug["size"]
         return None
 
     @property
@@ -301,9 +305,11 @@ class HerokuRelease(models.Model):
             return None
         return self.github_release["html_url"]
 
-    def github_release_body(self) -> str:
+    def github_release_body(self, **template_kwargs: object) -> str:
         """Render the copy used as the 'body' arg to create new release."""
-        return loader.render_to_string("release_tracker/release.md", {"release": self})
+        context = {"release": self}
+        context.update(template_kwargs)
+        return loader.render_to_string("release_tracker/release.md", context=context)
 
     def parse_heroku_api_response(self, data: dict) -> None:
         """Parse API release data into properties."""
@@ -389,5 +395,12 @@ class HerokuRelease(models.Model):
         self.github_release = None
         self.pushed_at = None
         self.save()
-        self.pushed_at = None
-        self.save()
+
+    def update_release_notes(self) -> None:
+        if not self.pushed_at:
+            raise ValueError("Release has not yet been pushed to Github.")
+        generated_notes = github.generate_release_notes(self.tag_name)
+        print("generated notes", generated_notes)
+        release_note = self.github_release_body(generated_notes=generated_notes)
+        print("release note", release_note)
+        github.update_release(self.github_release_id, {"body": release_note})

@@ -28,7 +28,6 @@ class Command(BaseCommand):
             hr.parse_heroku_api_response(release)
             try:
                 hr.save()
-                hr.update_parent()
             except IntegrityError as ex:
                 self.stderr.write(f"Error creating new release: {ex}")
                 self.stderr.write(release)

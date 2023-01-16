@@ -16,6 +16,7 @@ GITHUB_API_REPO_URL = (
     f"{GITHUB_API_BASE_URL}/repos/{GITHUB_ORG_NAME}/{GITHUB_REPO_NAME}"
 )
 GITHUB_API_RELEASES_URL = f"{GITHUB_API_REPO_URL}/releases"
+GITHUB_API_RELEASE_NOTES_URL = f"{GITHUB_API_RELEASES_URL}/generate-notes"
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,16 @@ def create_release(
     }
     release = _request("post", GITHUB_API_RELEASES_URL, json=data).json()
     return scrub_release(release)
+
+
+def generate_release_notes(tag_name: str) -> str:
+    """Generate release notes from the generate-notes API."""
+    response = _request(
+        "post",
+        GITHUB_API_RELEASE_NOTES_URL,
+        json={"tag_name": tag_name},
+    )
+    return response.json().get("body")
 
 
 def get_compare_url(base_head: str) -> str:
