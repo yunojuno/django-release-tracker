@@ -3,7 +3,6 @@ from os import getenv, path
 DEBUG = True
 TEMPLATE_DEBUG = True
 USE_TZ = True
-USE_L10N = True
 
 # Populated in settings.local / settings.heroku
 # DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": "demo.db"}}
