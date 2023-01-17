@@ -126,7 +126,7 @@ def create_release(
         "tag_name": tag_name,
         "name": f"Release {tag_name}",
         "target_commitish": commit,
-        "body": body,
+        "body": body or "",
         "generate_release_notes": generate_release_notes,
     }
     release = _request("post", GITHUB_API_RELEASES_URL, json=data).json()
