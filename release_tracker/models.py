@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from os import environ
 from typing import Any
 from uuid import UUID
 
@@ -9,13 +10,7 @@ from django.db import models
 from django.utils.timezone import now as tz_now
 
 from . import github, heroku
-from .settings import (
-    GITHUB_SYNC_ENABLED,
-    HEROKU_RELEASE_CREATED_AT,
-    HEROKU_RELEASE_VERSION,
-    HEROKU_SLUG_COMMIT,
-    HEROKU_SLUG_DESCRIPTION,
-)
+from .settings import GITHUB_SYNC_ENABLED
 
 logger = logging.getLogger(__name__)
 
@@ -52,43 +47,26 @@ def get_commit(description: str) -> str:
 def get_release_parent(version: int) -> HerokuRelease | None:
     """Fetch the most recent deployment."""
     return (
-        HerokuRelease.objects.deployments()
-        .filter(version__lt=version)
-        .order_by("version")
-        .last()
+        HerokuRelease.deployments.filter(version__lt=version).order_by("version").last()
     )
 
 
-class HerokuReleaseQuerySet(models.QuerySet):
-    def deployments(self) -> HerokuReleaseQuerySet:
-        return self.filter(
-            release_type__in=[
-                HerokuRelease.ReleaseType.DEPLOYMENT,
-                HerokuRelease.ReleaseType.PROMOTION,
-            ]
-        )
-
-
 class HerokuReleaseManager(models.Manager):
-    def auto_create(self) -> HerokuRelease:
-        """Create a new release from the current running dyno."""
-        if not HEROKU_RELEASE_VERSION:
-            raise Exception("Missing HEROKU_RELEASE_VERSION env var.")
-        if not HEROKU_RELEASE_CREATED_AT:
-            raise Exception("Missing HEROKU_RELEASE_CREATED_AT env var.")
-        if not HEROKU_SLUG_COMMIT:
-            raise Exception("Missing HEROKU_SLUG_COMMIT env var.")
-        if not HEROKU_SLUG_DESCRIPTION:
-            raise Exception("Missing HEROKU_SLUG_DESCRIPTION env var.")
-        release = self.create(
-            version=HEROKU_RELEASE_VERSION,
-            created_at=HEROKU_RELEASE_CREATED_AT,
-            commit=HEROKU_SLUG_COMMIT,
-            commit_description=HEROKU_SLUG_DESCRIPTION,
-            release_type=get_release_type(HEROKU_SLUG_DESCRIPTION),
+    def stash(self) -> HerokuRelease:
+        """Create a new skeleton release from the environment variables."""
+        # the following are set by Heroku if the Dyno Metadata feature
+        # is installed. https://devcenter.heroku.com/articles/dyno-metadata
+        created_at = dateparser.parse(environ["HEROKU_RELEASE_CREATED_AT"])
+        version = int(environ["HEROKU_RELEASE_VERSION"].strip("v"))
+        commit = environ["HEROKU_SLUG_COMMIT"]
+        commit_description = environ["HEROKU_SLUG_DESCRIPTION"]
+        return self.create(
+            version=version,
+            created_at=created_at,
+            commit=commit,
+            commit_description=commit_description,
+            release_type=get_release_type(commit_description),
         )
-        release.update_parent()
-        return release
 
     def create_from_api(
         self,
@@ -128,6 +106,20 @@ class HerokuReleaseManager(models.Manager):
         )
 
 
+class HerokuDeploymentReleaseManager(HerokuReleaseManager):
+    def get_queryset(self) -> models.QuerySet[HerokuRelease]:
+        return (
+            super()
+            .get_queryset()
+            .filter(
+                release_type__in=[
+                    HerokuRelease.ReleaseType.DEPLOYMENT,
+                    HerokuRelease.ReleaseType.PROMOTION,
+                ]
+            )
+        )
+
+
 class HerokuRelease(models.Model):
     class ReleaseType(models.TextChoices):
 
@@ -137,6 +129,9 @@ class HerokuRelease(models.Model):
         ADD_ON = ("ADD_ON", "Add-ons")
         ENV_VARS = ("ENV_VARS", "Config vars")
         OTHER = ("OTHER", "Other (misc.)")
+
+    # these two release types both represent a new code deployment
+    deployment_release_types = [ReleaseType.DEPLOYMENT, ReleaseType.PROMOTION]
 
     version = models.PositiveIntegerField(unique=True)
 
@@ -218,7 +213,8 @@ class HerokuRelease(models.Model):
         default=ReleaseType.OTHER,
     )
 
-    objects = HerokuReleaseManager.from_queryset(HerokuReleaseQuerySet)()
+    objects = HerokuReleaseManager()
+    deployments = HerokuDeploymentReleaseManager()
 
     def __repr__(self) -> str:
         return f"<HerokuRelease version={self.version}>"
@@ -229,10 +225,7 @@ class HerokuRelease(models.Model):
     @property
     def is_deployment(self) -> bool:
         """Return True if this represents a new code deployment."""
-        return self.release_type in [
-            HerokuRelease.ReleaseType.DEPLOYMENT,
-            HerokuRelease.ReleaseType.PROMOTION,
-        ]
+        return self.release_type in self.deployment_release_types
 
     @property
     def short_commit(self) -> str:
@@ -356,9 +349,11 @@ class HerokuRelease(models.Model):
             raise AttributeError(f"{self} is missing tag_name property.")
         if not self.commit:
             raise AttributeError(f"{self} is missing commit property.")
+        if not self.parent:
+            raise AttributeError(f"{self} is missing parent property.")
         # if the parent has not been pushed then autogenerating the
         # release note will pull in every commit in history...
-        generate_release_notes = bool(self.parent and self.parent.pushed_at)
+        generate_release_notes = bool(self.parent.pushed_at)
         self.github_release = github.get_release(
             self.tag_name
         ) or github.create_release(
@@ -372,6 +367,7 @@ class HerokuRelease(models.Model):
     def sync(self) -> None:
         """Pull from Heroku and push to Github."""
         self.pull()
+        self.update_parent()
         self.push()
 
     def delete_from_github(self) -> None:

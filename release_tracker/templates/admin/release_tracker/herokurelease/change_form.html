@@ -11,6 +11,9 @@
     <li>
         <a href="{% url 'release_tracker:admin_push' original.pk %}">Push to Github</a>
     </li>
+    <li>
+        <a href="{% url 'release_tracker:admin_release_notes' original.pk %}">Update release notes</a>
+    </li>
     {% endif %}
     <li>
         <a href="{% url 'release_tracker:admin_sync' original.pk %}">Sync</a>

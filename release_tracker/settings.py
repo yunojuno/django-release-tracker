@@ -1,31 +1,9 @@
-import datetime
 from os import getenv
-
-import dateparser
 
 # Token used with the Platform API
 HEROKU_API_TOKEN = getenv("HEROKU_API_TOKEN")
 
-
-# Values set by dyno runtime metadata
-def _release_version() -> int | None:
-    if version := getenv("HEROKU_RELEASE_VERSION"):
-        return int(version.strip("v"))
-
-
-def _created_at() -> datetime.datetime | None:
-    if created_at := getenv("HEROKU_RELEASE_CREATED_AT"):
-        return dateparser.parse(created_at)
-    return None
-
-
-HEROKU_APP_ID = getenv("HEROKU_APP_ID")
 HEROKU_APP_NAME = getenv("HEROKU_APP_NAME")
-HEROKU_RELEASE_CREATED_AT = _created_at()
-HEROKU_RELEASE_VERSION = _release_version()
-HEROKU_SLUG_COMMIT = getenv("HEROKU_SLUG_COMMIT")
-HEROKU_SLUG_DESCRIPTION = getenv("HEROKU_SLUG_DESCRIPTION")
-
 
 # Token used with the Github API
 GITHUB_API_TOKEN = getenv("GITHUB_API_TOKEN")

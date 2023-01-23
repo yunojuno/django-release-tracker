@@ -1,4 +1,5 @@
 import json
+import logging
 
 import requests
 from django.contrib import admin
@@ -7,7 +8,9 @@ from django.http import HttpRequest
 from django.utils.safestring import mark_safe
 
 from .github import get_compare_url
-from .models import HerokuRelease, HerokuReleaseQuerySet
+from .models import HerokuRelease
+
+logger = logging.getLogger(__name__)
 
 
 def format_json(json_: dict) -> str:
@@ -23,7 +26,9 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "created_at",
         "description",
         "slug_size_display",
-        "synced_",
+        "has_parent",
+        "pulled",
+        "pushed",
         "diff_url",
         "release_url",
     )
@@ -56,6 +61,18 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "delete_releases",
         "update_release_notes",
     )
+
+    @admin.display(boolean=True)
+    def has_parent(self, obj: HerokuRelease) -> bool:
+        return bool(obj.parent_id)
+
+    @admin.display(boolean=True)
+    def pulled(self, obj: HerokuRelease) -> bool:
+        return bool(obj.pulled_at)
+
+    @admin.display(boolean=True)
+    def pushed(self, obj: HerokuRelease) -> bool:
+        return bool(obj.pushed_at)
 
     @admin.display(description="Slug size (MB)")
     def slug_size_display(self, obj: HerokuRelease) -> str:
@@ -97,17 +114,20 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
     def github_(self, obj: HerokuRelease) -> str:
         return format_json(obj.github_release)
 
-    @admin.action(description="Update selected release parents")
+    @admin.action(description="Update parent releases")
     def set_parent_releases(
-        self, request: HttpRequest, qs: HerokuReleaseQuerySet
+        self, request: HttpRequest, qs: QuerySet[HerokuRelease]
     ) -> None:
         updated = failed = 0
         ignored = qs.exclude(release_type=HerokuRelease.ReleaseType.DEPLOYMENT).count()
-        for obj in qs.deployments().order_by("id"):
+        for obj in qs.order_by("id"):
+            if not obj.is_deployment:
+                continue
             try:
                 obj.update_parent()
                 updated += 1
             except Exception:  # noqa: B902
+                logger.exception("Error updating parent release.")
                 failed += 1
         if updated:
             self.message_user(
@@ -122,16 +142,18 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
                 request, f"Failed to update {failed}  Heroku releases.", "error"
             )
 
-    @admin.action(description="Pull selected releases from Heroku")
-    def pull_from_heroku(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
+    @admin.action(description="Pull from Heroku")
+    def pull_from_heroku(
+        self, request: HttpRequest, qs: QuerySet[HerokuRelease]
+    ) -> None:
         for obj in qs:
             obj.pull()
         self.message_user(
             request, f"Pulled {qs.count()} releases from Heroku.", "success"
         )
 
-    @admin.action(description="Push selected releases to Github")
-    def push_to_github(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
+    @admin.action(description="Push to Github")
+    def push_to_github(self, request: HttpRequest, qs: QuerySet[HerokuRelease]) -> None:
         pushed = failed = 0
         for obj in qs:
             try:
@@ -149,10 +171,11 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
                 request, f"Failed to push {failed} releases to Github.", "error"
             )
 
-    @admin.action(description="Sync selected releases (Heroku to Github)")
-    def sync_releases(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
-        qs = qs.deployments()
+    @admin.action(description="Sync (pull then push)")
+    def sync_releases(self, request: HttpRequest, qs: QuerySet[HerokuRelease]) -> None:
         for obj in qs:
+            if not obj.is_deployment:
+                continue
             try:
                 obj.sync()
             except requests.HTTPError:
@@ -163,11 +186,14 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
             "success",
         )
 
-    @admin.action(description="Delete selected releases from Github")
-    def delete_releases(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
-        qs = qs.deployments()
+    @admin.action(description="Delete from Github")
+    def delete_releases(
+        self, request: HttpRequest, qs: QuerySet[HerokuRelease]
+    ) -> None:
         deleted = 0
         for obj in qs:
+            if not obj.is_deployment:
+                continue
             obj.delete_from_github()
             deleted += 1
         if deleted:
@@ -181,10 +207,11 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
     def update_release_notes(
         self, request: HttpRequest, qs: QuerySet[HerokuRelease]
     ) -> None:
-        qs = qs.deployments()
         updated = 0
         for obj in qs:
-            obj.update_release_notes()
+            if not obj.is_deployment:
+                continue
+            obj.update_generated_release_notes()
             updated += 1
         if updated:
             self.message_user(
