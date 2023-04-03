@@ -383,7 +383,9 @@ class HerokuRelease(models.Model):
         """Update the automated release notes."""
         if not (self.pushed_at and self.github_release_id):
             raise ValueError("Release has not yet been pushed to Github.")
-        github.update_release(
+        self.github_release = github.update_release(
             self.github_release_id,
             {"body": github.generate_release_notes(self.tag_name)},
         )
+        self.pushed_at = tz_now()
+        self.save()
