@@ -6,7 +6,9 @@ from typing import Any
 from uuid import UUID
 
 import dateparser
+from django.conf import settings
 from django.db import models
+from django.template.defaultfilters import date as datefmt
 from django.utils.timezone import now as tz_now
 
 from . import github, heroku
@@ -237,9 +239,13 @@ class HerokuRelease(models.Model):
         return ""
 
     @property
+    def created_at_display(self) -> str:
+        return datefmt(self.created_at, settings.DATETIME_FORMAT)
+
+    @property
     def release_name(self) -> str:
         if self.is_deployment:
-            return f"Release {self.tag_name} - {self.created_at.isoformat()}"
+            return f"Release {self.tag_name} - {self.created_at_display}"
         return ""
 
     @property
