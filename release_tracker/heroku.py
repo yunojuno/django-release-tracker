@@ -20,19 +20,19 @@ def _get(url: str, **headers: str) -> requests.Response:
     check_auth()
     headers.setdefault("Authorization", f"Bearer {HEROKU_API_TOKEN}")
     headers.setdefault("Accept", "Accept: application/vnd.heroku+json; version=3")
-    response = requests.get(f"{API_PREFIX}{url}", headers=headers)
+    response = requests.get(f"{API_PREFIX}{url}", headers=headers, timeout=10)
     response.raise_for_status()
     return response
 
 
 def crawl(max_count: int, range_start: str = "id ..", page_size: int = 1000) -> list:
     logger.debug("Crawling releases (max_count=%i)", max_count)
-    range = f"{range_start};max={page_size}"
+    next_range = f"{range_start};max={page_size}"
     releases: list[dict] = []
-    while range and len(releases) < max_count:
-        response = _get("releases", Range=range)
+    while next_range and len(releases) < max_count:
+        response = _get("releases", Range=next_range)
         releases += response.json()
-        range = response.headers.get("Next-Range", "")
+        next_range = response.headers.get("Next-Range", "")
     return releases
 
 

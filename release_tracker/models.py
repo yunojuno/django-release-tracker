@@ -122,7 +122,6 @@ class HerokuDeploymentReleaseManager(HerokuReleaseManager):
 
 class HerokuRelease(models.Model):
     class ReleaseType(models.TextChoices):
-
         DEPLOYMENT = ("DEPLOYMENT", "Slug deployment")
         PROMOTION = ("PROMOTION", "Pipeline promotion")
         ROLLBACK = ("ROLLBACK", "Release rollback")
@@ -238,6 +237,12 @@ class HerokuRelease(models.Model):
         return ""
 
     @property
+    def release_name(self) -> str:
+        if self.is_deployment:
+            return f"Release {self.tag_name} - {self.created_at}"
+        return ""
+
+    @property
     def is_synced(self) -> bool | None:
         return self.pulled_at and self.pushed_at
 
@@ -268,16 +273,6 @@ class HerokuRelease(models.Model):
         if not self.slug_size:
             return ""
         return f"{int(self.slug_size / 1024 / 1024)}MB"
-
-    def get_parent(self) -> HerokuRelease | None:
-        """Return first deployment before this one."""
-        if self.is_deployment:
-            return get_release_parent(self.version)
-        return None
-
-    def update_parent(self) -> None:
-        self.parent = self.get_parent()
-        self.save(update_fields=["parent"])
 
     @property
     def heroku_release_id(self) -> UUID | None:
@@ -331,6 +326,16 @@ class HerokuRelease(models.Model):
         self.pulled_at = tz_now()
         self.save()
 
+    def get_parent(self) -> HerokuRelease | None:
+        """Return first deployment before this one."""
+        if self.is_deployment:
+            return get_release_parent(self.version)
+        return None
+
+    def update_parent(self) -> None:
+        self.parent = self.get_parent()
+        self.save(update_fields=["parent"])
+
     def push(self) -> None:
         """
         Push release data to Github.
@@ -358,6 +363,7 @@ class HerokuRelease(models.Model):
             self.tag_name
         ) or github.create_release(
             tag_name=self.tag_name,
+            release_name=self.release_name,
             commit=self.commit,
             generate_release_notes=generate_release_notes,
         )
@@ -379,13 +385,21 @@ class HerokuRelease(models.Model):
         self.pushed_at = None
         self.save()
 
-    def update_generated_release_notes(self) -> None:
-        """Update the automated release notes."""
+    def update_release_notes(self, notes: str, generate: bool = True) -> None:
+        """
+        Update the release notes on Github.
+
+        This method combines custom notes with the generated release notes
+        provided by Github.
+
+        """
         if not (self.pushed_at and self.github_release_id):
             raise ValueError("Release has not yet been pushed to Github.")
-        self.github_release = github.update_release(
-            self.github_release_id,
-            {"body": github.generate_release_notes(self.tag_name)},
-        )
-        self.pushed_at = tz_now()
-        self.save()
+        body = []
+        notes = notes
+        if notes:
+            body.append(notes)
+        if generate:
+            body.append(github.generate_release_notes(self.tag_name))
+        release_note = "\n---\n".join(body)
+        github.update_release(self.github_release_id, {"body": release_note})

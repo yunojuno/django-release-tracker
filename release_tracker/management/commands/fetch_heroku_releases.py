@@ -13,7 +13,6 @@ class Command(BaseCommand):
         super().add_arguments(parser)
 
     def handle(self, *args: Any, **options: Any) -> None:
-
         all_releases = crawl(max_count=10000)
         existing_releases = HerokuRelease.objects.all().values_list(
             "version", flat=True

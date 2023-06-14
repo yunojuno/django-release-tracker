@@ -25,7 +25,8 @@ def format_api_errors(ex: requests.HTTPError) -> str:  # noqa: C901 (11)
     """
     Format error messages.
 
-    See https://docs.github.com/en/rest/overview/resources-in-the-rest-api?apiVersion=2022-11-28#client-errors  # noqa: E501
+    See https://docs.github.com/en/rest/overview/\
+        resources-in-the-rest-api?apiVersion=2022-11-28#client-errors
 
     """
     response = ex.response
@@ -117,6 +118,7 @@ def delete_release(release_id: int) -> None:
 
 def create_release(
     tag_name: str,
+    release_name: str,
     commit: str,
     body: str | None = None,
     generate_release_notes: bool = True,
@@ -124,7 +126,7 @@ def create_release(
     """Create a new Github release."""
     data = {
         "tag_name": tag_name,
-        "name": f"Release {tag_name}",
+        "name": release_name,
         "target_commitish": commit,
         "body": body or "",
         "generate_release_notes": generate_release_notes,
