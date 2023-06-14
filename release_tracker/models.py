@@ -239,7 +239,7 @@ class HerokuRelease(models.Model):
     @property
     def release_name(self) -> str:
         if self.is_deployment:
-            return f"Release {self.tag_name} - {self.created_at}"
+            return f"Release {self.tag_name} - {self.created_at.isoformat()}"
         return ""
 
     @property
