@@ -8,7 +8,7 @@ from django.http import HttpRequest
 from django.utils.safestring import mark_safe
 
 from .github import get_compare_url
-from .models import HerokuRelease
+from .models import HerokuRelease, HerokuReleaseQuerySet
 
 logger = logging.getLogger(__name__)
 
@@ -187,9 +187,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         )
 
     @admin.action(description="Delete from Github")
-    def delete_releases(
-        self, request: HttpRequest, qs: QuerySet[HerokuRelease]
-    ) -> None:
+    def delete_releases(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
         deleted = 0
         for obj in qs:
             if not obj.is_deployment:
@@ -205,17 +203,14 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
 
     @admin.action(description="Update Github release notes")
     def update_release_notes(
-        self, request: HttpRequest, qs: QuerySet[HerokuRelease]
+        self, request: HttpRequest, qs: HerokuReleaseQuerySet
     ) -> None:
-        updated = 0
-        for obj in qs:
-            if not obj.is_deployment:
-                continue
-            obj.update_generated_release_notes()
-            updated += 1
-        if updated:
+        succeeded, failed, ignored = qs.update_github_release()
+        if succeeded:
+            self.message_user(request, f"Updated {succeeded} release(s).", "success")
+        if failed:
             self.message_user(
-                request,
-                f"Updated {updated} releases.",
-                "success",
+                request, f"Failed to update {failed} release(s).", "error"
             )
+        if ignored:
+            self.message_user(request, f"Ignored {ignored} release(s).", "warning")

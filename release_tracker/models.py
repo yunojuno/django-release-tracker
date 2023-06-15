@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections import namedtuple
 from os import environ
-from typing import Any
+from typing import Any, Callable
 from uuid import UUID
 
 import dateparser
@@ -15,6 +16,8 @@ from . import github, heroku
 from .settings import GITHUB_SYNC_ENABLED
 
 logger = logging.getLogger(__name__)
+# tuple used to store results of batch operations
+BatchResults = namedtuple("BatchResults", ["succeeded", "failed", "ignored"])
 
 
 def get_release_type(description: str) -> str:  # noqa: C901
@@ -51,6 +54,51 @@ def get_release_parent(version: int) -> HerokuRelease | None:
     return (
         HerokuRelease.deployments.filter(version__lt=version).order_by("version").last()
     )
+
+
+class HerokuReleaseQuerySet(models.QuerySet):
+    def _batch(self, method: str, skip_if: Callable) -> BatchResults:
+        succeeded = failed = ignored = 0
+        for obj in self.order_by("id").iterator():
+            if skip_if(obj):
+                logger.exception("Skipping object %r", obj)
+                ignored += 1
+                continue
+            try:
+                getattr(obj, method)()
+            except Exception:  # noqa: B902
+                failed += 1
+                logger.exception("Error calling '%s' on object %r", method, obj)
+            else:
+                succeeded += 1
+        return BatchResults(succeeded, failed, ignored)
+
+    def set_parent_releases(self) -> BatchResults:
+        return self._batch("update_parent", lambda obj: not obj.is_deployment)
+
+    def pull(self, force: bool = False) -> BatchResults:
+        """
+        Pull most recent release data from Heroku.
+
+        By default this will ignore releases that have already been
+        pulled. Use the `force` kwarg to override this.
+
+        """
+        return self._batch("pull", lambda obj: not force and obj.pulled_at)
+
+    def push(self, force: bool = False) -> BatchResults:
+        """
+        Push release data to Github.
+
+        By default this will ignore releases that have already been
+        pushed. Use the `force` kwarg to override this.
+
+        """
+        return self._batch("push", lambda obj: not force and obj.pushed_at)
+
+    def update_github_release(self) -> BatchResults:
+        """Update the release notes on Github."""
+        return self._batch("update_github_release", lambda obj: not obj.is_deployment)
 
 
 class HerokuReleaseManager(models.Manager):
@@ -214,8 +262,8 @@ class HerokuRelease(models.Model):
         default=ReleaseType.OTHER,
     )
 
-    objects = HerokuReleaseManager()
-    deployments = HerokuDeploymentReleaseManager()
+    objects = HerokuReleaseManager.from_queryset(HerokuReleaseQuerySet)()
+    deployments = HerokuDeploymentReleaseManager.from_queryset(HerokuReleaseQuerySet)()
 
     def __repr__(self) -> str:
         return f"<HerokuRelease version={self.version}>"
@@ -391,21 +439,22 @@ class HerokuRelease(models.Model):
         self.pushed_at = None
         self.save()
 
-    def update_release_notes(self, notes: str, generate: bool = True) -> None:
+    def update_github_release(self) -> None:
         """
         Update the release notes on Github.
 
-        This method combines custom notes with the generated release notes
-        provided by Github.
+        This method fetches the auto-generated release notes from the
+        Github API and the release_name and re-pushes to Github. Useful
+        if the release get out of sync for some reason, or if we decide
+        to change the format and need to re-generate the notes.
 
         """
         if not (self.pushed_at and self.github_release_id):
             raise ValueError("Release has not yet been pushed to Github.")
-        body = []
-        notes = notes
-        if notes:
-            body.append(notes)
-        if generate:
-            body.append(github.generate_release_notes(self.tag_name))
-        release_note = "\n---\n".join(body)
-        github.update_release(self.github_release_id, {"body": release_note})
+        github.update_release(
+            self.github_release_id,
+            {
+                "body": github.generate_release_notes(self.tag_name),
+                "name": self.release_name,
+            },
+        )
