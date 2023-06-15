@@ -1,14 +1,13 @@
 import json
 import logging
 
-import requests
 from django.contrib import admin
 from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.utils.safestring import mark_safe
 
 from .github import get_compare_url
-from .models import HerokuRelease, HerokuReleaseQuerySet
+from .models import BatchResults, HerokuRelease, HerokuReleaseQuerySet
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +56,8 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "set_parent_releases",
         "pull_from_heroku",
         "push_to_github",
-        "sync_releases",
-        "delete_releases",
+        # "sync_releases",
+        # "delete_releases",
         "update_release_notes",
     )
 
@@ -114,103 +113,38 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
     def github_(self, obj: HerokuRelease) -> str:
         return format_json(obj.github_release)
 
+    def _message_user(self, request: HttpRequest, results: BatchResults) -> None:
+        if results.succeeded:
+            self.message_user(
+                request, f"Updated {results.succeeded} releases.", "success"
+            )
+        if results.failed:
+            self.message_user(
+                request, f"Failed to update {results.failed} releases.", "error"
+            )
+        if results.ignored:
+            self.message_user(request, f"Ignored {results.ignored} releases", "warning")
+
     @admin.action(description="Update parent releases")
     def set_parent_releases(
-        self, request: HttpRequest, qs: QuerySet[HerokuRelease]
+        self, request: HttpRequest, qs: HerokuReleaseQuerySet
     ) -> None:
-        updated = failed = 0
-        ignored = qs.exclude(release_type=HerokuRelease.ReleaseType.DEPLOYMENT).count()
-        for obj in qs.order_by("id"):
-            if not obj.is_deployment:
-                continue
-            try:
-                obj.update_parent()
-                updated += 1
-            except Exception:  # noqa: B902
-                logger.exception("Error updating parent release.")
-                failed += 1
-        if updated:
-            self.message_user(
-                request, f"Updated {updated}  Heroku releases.", "success"
-            )
-        if ignored:
-            self.message_user(
-                request, f"Ignored {ignored} non-deployment releases", "warning"
-            )
-        if failed:
-            self.message_user(
-                request, f"Failed to update {failed}  Heroku releases.", "error"
-            )
+        results = qs.set_parent_releases()
+        self._message_user(request, results)
 
     @admin.action(description="Pull from Heroku")
-    def pull_from_heroku(
-        self, request: HttpRequest, qs: QuerySet[HerokuRelease]
-    ) -> None:
-        for obj in qs:
-            obj.pull()
-        self.message_user(
-            request, f"Pulled {qs.count()} releases from Heroku.", "success"
-        )
+    def pull_from_heroku(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
+        results = qs.pull()
+        self._message_user(request, results)
 
     @admin.action(description="Push to Github")
     def push_to_github(self, request: HttpRequest, qs: QuerySet[HerokuRelease]) -> None:
-        pushed = failed = 0
-        for obj in qs:
-            try:
-                obj.push()
-            except Exception:  # noqa: B902
-                failed += 1
-            else:
-                pushed += 1
-        if pushed:
-            self.message_user(
-                request, f"Pushed {pushed} releases to Github.", "success"
-            )
-        if failed:
-            self.message_user(
-                request, f"Failed to push {failed} releases to Github.", "error"
-            )
-
-    @admin.action(description="Sync (pull then push)")
-    def sync_releases(self, request: HttpRequest, qs: QuerySet[HerokuRelease]) -> None:
-        for obj in qs:
-            if not obj.is_deployment:
-                continue
-            try:
-                obj.sync()
-            except requests.HTTPError:
-                pass
-        self.message_user(
-            request,
-            f"Synced {qs.count()} releases between Heroku and Github.",
-            "success",
-        )
-
-    @admin.action(description="Delete from Github")
-    def delete_releases(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
-        deleted = 0
-        for obj in qs:
-            if not obj.is_deployment:
-                continue
-            obj.delete_from_github()
-            deleted += 1
-        if deleted:
-            self.message_user(
-                request,
-                f"Deleted {deleted} releases from Github.",
-                "success",
-            )
+        results = qs.push()
+        self._message_user(request, results)
 
     @admin.action(description="Update Github release notes")
     def update_release_notes(
         self, request: HttpRequest, qs: HerokuReleaseQuerySet
     ) -> None:
-        succeeded, failed, ignored = qs.update_github_release()
-        if succeeded:
-            self.message_user(request, f"Updated {succeeded} release(s).", "success")
-        if failed:
-            self.message_user(
-                request, f"Failed to update {failed} release(s).", "error"
-            )
-        if ignored:
-            self.message_user(request, f"Ignored {ignored} release(s).", "warning")
+        results = qs.update_github_release()
+        self._message_user(request, results)
