@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 # tuple used to store results of batch operations
 BatchResults = namedtuple("BatchResults", ["succeeded", "failed", "ignored"])
 
+# yes, it's hardcoded - can be extracted to setting if required.
+MAX_BATCH_COUNT = 100
+
 
 def get_release_type(description: str) -> str:  # noqa: C901
     """Extract release type from description."""
@@ -57,11 +60,13 @@ def get_release_parent(version: int) -> HerokuRelease | None:
 
 
 class HerokuReleaseQuerySet(models.QuerySet):
-    def _batch(self, method: str, skip_if: Callable) -> BatchResults:
+    def _batch(
+        self, method: str, skip_if: Callable[[HerokuRelease], bool], max_count: int
+    ) -> BatchResults:
         succeeded = failed = ignored = 0
         # force ordering as most operations require that releases are
         # processed in chronological order.
-        for obj in self.order_by("version"):
+        for obj in self.order_by("version")[:max_count]:
             if skip_if(obj):
                 logger.exception("Skipping object %r", obj)
                 ignored += 1
@@ -75,10 +80,13 @@ class HerokuReleaseQuerySet(models.QuerySet):
                 succeeded += 1
         return BatchResults(succeeded, failed, ignored)
 
-    def set_parent_releases(self) -> BatchResults:
-        return self._batch("update_parent", lambda obj: not obj.is_deployment)
+    def set_parent_releases(self, max_count: int = MAX_BATCH_COUNT) -> BatchResults:
+        skip_if = lambda obj: not obj.is_deployment  # noqa
+        return self._batch("update_parent", skip_if, max_count)
 
-    def pull(self, force: bool = False) -> BatchResults:
+    def pull(
+        self, force: bool = False, max_count: int = MAX_BATCH_COUNT
+    ) -> BatchResults:
         """
         Pull most recent release data from Heroku.
 
@@ -86,9 +94,12 @@ class HerokuReleaseQuerySet(models.QuerySet):
         pulled. Use the `force` kwarg to override this.
 
         """
-        return self._batch("pull", lambda obj: not force and obj.pulled_at)
+        skip_if = lambda obj: not force and obj.pulled_at  # noqa
+        return self._batch("pull", skip_if, max_count)
 
-    def push(self, force: bool = False) -> BatchResults:
+    def push(
+        self, force: bool = False, max_count: int = MAX_BATCH_COUNT
+    ) -> BatchResults:
         """
         Push release data to Github.
 
@@ -96,9 +107,12 @@ class HerokuReleaseQuerySet(models.QuerySet):
         pushed. Use the `force` kwarg to override this.
 
         """
-        return self._batch("push", lambda obj: not force and obj.pushed_at)
+        skip_if = lambda obj: not force and obj.pushed_at  # noqa
+        return self._batch("push", skip_if, max_count)
 
-    def sync(self, force: bool = False) -> BatchResults:
+    def sync(
+        self, force: bool = False, max_count: int = MAX_BATCH_COUNT
+    ) -> BatchResults:
         """
         Sync releases - pull from Heroku and push to Github.
 
@@ -106,14 +120,13 @@ class HerokuReleaseQuerySet(models.QuerySet):
         pulled and pushed. Use the `force` kwarg to override this.
 
         """
-        return self._batch(
-            "sync",
-            lambda obj: not force and (obj.pushed_at and obj.pulled_at),
-        )
+        skip_if = lambda obj: not force and (obj.pulled_at and obj.pushed_at)  # noqa
+        return self._batch("sync", skip_if, max_count)
 
-    def update_github_release(self) -> BatchResults:
+    def update_github_release(self, max_count: int = MAX_BATCH_COUNT) -> BatchResults:
         """Update the release notes on Github."""
-        return self._batch("sync", lambda obj: not obj.is_deployment)
+        skip_if = lambda obj: not obj.is_deployment  # noqa
+        return self._batch("sync", skip_if, max_count)
 
 
 class HerokuReleaseManager(models.Manager):
