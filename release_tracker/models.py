@@ -59,7 +59,9 @@ def get_release_parent(version: int) -> HerokuRelease | None:
 class HerokuReleaseQuerySet(models.QuerySet):
     def _batch(self, method: str, skip_if: Callable) -> BatchResults:
         succeeded = failed = ignored = 0
-        for obj in self.order_by("id").iterator():
+        # force ordering as most operations require that releases are
+        # processed in chronological order.
+        for obj in self.order_by("version"):
             if skip_if(obj):
                 logger.exception("Skipping object %r", obj)
                 ignored += 1
@@ -123,13 +125,15 @@ class HerokuReleaseManager(models.Manager):
         version = int(environ["HEROKU_RELEASE_VERSION"].strip("v"))
         commit = environ["HEROKU_SLUG_COMMIT"]
         commit_description = environ["HEROKU_SLUG_DESCRIPTION"]
-        return self.create(
+        release = self.create(
             version=version,
             created_at=created_at,
             commit=commit,
             commit_description=commit_description,
             release_type=get_release_type(commit_description),
         )
+        release.update_parent()
+        return release
 
     def create_from_api(
         self,
