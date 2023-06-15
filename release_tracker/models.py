@@ -96,9 +96,22 @@ class HerokuReleaseQuerySet(models.QuerySet):
         """
         return self._batch("push", lambda obj: not force and obj.pushed_at)
 
+    def sync(self, force: bool = False) -> BatchResults:
+        """
+        Sync releases - pull from Heroku and push to Github.
+
+        By default this will ignore releases that have already been
+        pulled and pushed. Use the `force` kwarg to override this.
+
+        """
+        return self._batch(
+            "sync",
+            lambda obj: not force and (obj.pushed_at and obj.pulled_at),
+        )
+
     def update_github_release(self) -> BatchResults:
         """Update the release notes on Github."""
-        return self._batch("update_github_release", lambda obj: not obj.is_deployment)
+        return self._batch("sync", lambda obj: not obj.is_deployment)
 
 
 class HerokuReleaseManager(models.Manager):

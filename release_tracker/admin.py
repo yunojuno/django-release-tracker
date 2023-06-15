@@ -56,8 +56,7 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
         "set_parent_releases",
         "pull_from_heroku",
         "push_to_github",
-        # "sync_releases",
-        # "delete_releases",
+        "sync_releases",
         "update_release_notes",
     )
 
@@ -129,18 +128,19 @@ class HerokuReleaseAdmin(admin.ModelAdmin):
     def set_parent_releases(
         self, request: HttpRequest, qs: HerokuReleaseQuerySet
     ) -> None:
-        results = qs.set_parent_releases()
-        self._message_user(request, results)
+        self._message_user(request, qs.set_parent_releases())
 
-    @admin.action(description="Pull from Heroku")
+    @admin.action(description="Pull releases from Heroku")
     def pull_from_heroku(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
-        results = qs.pull()
-        self._message_user(request, results)
+        self._message_user(request, qs.pull())
 
-    @admin.action(description="Push to Github")
+    @admin.action(description="Push releases to Github")
     def push_to_github(self, request: HttpRequest, qs: QuerySet[HerokuRelease]) -> None:
-        results = qs.push()
-        self._message_user(request, results)
+        self._message_user(request, qs.push())
+
+    @admin.action(description="Sync releases (pull & push)")
+    def sync_releases(self, request: HttpRequest, qs: HerokuReleaseQuerySet) -> None:
+        self._message_user(request, qs.sync())
 
     @admin.action(description="Update Github release notes")
     def update_release_notes(
