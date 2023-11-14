@@ -30,11 +30,13 @@ def format_api_errors(ex: requests.HTTPError) -> str:  # noqa: C901 (11)
 
     """
     response = ex.response
+    if response is None:
+        return ""
 
-    def _400() -> str:
+    def _400(response: requests.Response) -> str:
         return response.json()["message"]
 
-    def _422() -> str:
+    def _422(response: requests.Response) -> str:
         try:
             errors: list[dict] = response.json()["errors"]
             return "\n".join(
@@ -46,9 +48,9 @@ def format_api_errors(ex: requests.HTTPError) -> str:  # noqa: C901 (11)
         return ""
 
     if response.status_code == 400:
-        return _400()
+        return _400(response)
     if response.status_code == 422:
-        return _422()
+        return _422(response)
     if response.status_code == 500:
         return f"Unknown server error: {ex}"
     return ""
