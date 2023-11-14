@@ -1,0 +1,10 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [0.2] - 2023-11-14
+
+- Add support for Django 5.0
+- Add support for Python 3.12
+
+No code changes.
