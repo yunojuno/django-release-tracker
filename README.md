@@ -2,6 +2,11 @@
 
 Django app for syncing Heroku and Github releases.
 
+> **⚠️ DEPRECATION NOTICE**
+> 
+> This library is no longer maintained and has been retired. We recommend migrating to alternative solutions for syncing Heroku and GitHub releases. No further updates, bug fixes, or security patches will be provided.
+
+
 ## Version support
 
 This app support Django 3.2+ and Python 3.10+.
